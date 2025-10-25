@@ -1,0 +1,27 @@
+{
+  "name": "@rawops/rawbot",
+  "version": "1.0.0",
+  "description": "Complete Twitter automation bot with Selenium and AI integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@rawops/rawops": "workspace:*",
+    "@rawops/shared": "workspace:*",
+    "@rawops/rawai": "workspace:*",
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  },
+  "keywords": ["twitter", "automation", "selenium", "ai", "bot"],
+  "author": "RawOps Team",
+  "license": "MIT",
+  "packageManager": "pnpm@10.9.0"
+}

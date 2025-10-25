@@ -1,0 +1,30 @@
+{
+  "name": "@rawops/rawops",
+  "version": "1.0.0",
+  "description": "Raw operations library for Selenium-based Twitter automation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "chromedriver": "^141.0.1",
+    "proxy-chain": "^2.5.9",
+    "selenium-webdriver": "^4.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "selenium",
+    "twitter",
+    "automation",
+    "rawops"
+  ],
+  "author": "RawOps Team",
+  "license": "MIT"
+}

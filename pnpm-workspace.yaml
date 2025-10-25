@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+ignoredBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@tailwindcss/oxide'
+  - bcrypt
+  - chromedriver
+  - esbuild
+  - prisma
+  - sharp
+  - unrs-resolver
