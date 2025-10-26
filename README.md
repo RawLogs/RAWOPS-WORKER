@@ -56,6 +56,23 @@ mkdir profiles
 ```
 
 ### 7. Chạy Worker
+
+#### Cách 1: Sử dụng script tự động (Khuyến nghị)
+```bash
+# Windows - Chạy file batch
+start.bat
+
+# Hoặc sử dụng PowerShell
+.\start.ps1
+```
+
+Script sẽ tự động:
+- Kiểm tra và cài đặt dependencies
+- Tạo file `.env.local` nếu chưa có
+- Yêu cầu nhập API_KEY nếu chưa được cấu hình
+- Khởi động worker
+
+#### Cách 2: Chạy thủ công
 ```bash
 # Chạy worker trong production mode
 pnpm start
@@ -87,12 +104,16 @@ pnpm start
 
 ## ⚙️ Environment Variables
 
-Tạo file `.env.local` với các biến sau:
+Tạo file `.env.local` ở root của project với các biến sau:
 
 ```env
 WEB_API_URL=https://rawops.net/api
-API_KEY=rawops_....
+API_KEY=rawops_your_api_key_here
 ```
+
+**Lưu ý**: File `.env.local` nằm ở root `I:\AI\RAWOPS\RAWOPS-WORKER\.env.local`
+
+Nếu sử dụng `start.bat` hoặc `start.ps1`, file sẽ được tự động tạo và yêu cầu nhập API_KEY khi chạy.
 
 ## 🐛 Troubleshooting
 
