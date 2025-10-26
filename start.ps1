@@ -37,17 +37,28 @@ if (Test-Path $envFile) {
     foreach ($line in $envContent) {
         if ($line -match "^\s*API_KEY\s*=\s*(.+)$") {
             $apiKeyValue = $matches[1].Trim()
+            Write-Host "Found API_KEY in .env.local (length: $($apiKeyValue.Length))" -ForegroundColor Cyan
+            
             if ([string]::IsNullOrWhiteSpace($apiKeyValue) -or $apiKeyValue -eq '...' -or $apiKeyValue -eq 'your_api_key_here' -or $apiKeyValue -eq 'your_api_key_from_website') {
+                Write-Host "API_KEY is invalid: '$apiKeyValue'" -ForegroundColor Yellow
                 $needsApiKey = $true
+                $apiKeySet = $true
+                break
+            } else {
+                Write-Host "API_KEY is valid" -ForegroundColor Green
+                # Valid API_KEY found, don't need to prompt
+                $needsApiKey = $false
                 $apiKeySet = $true
                 break
             }
         }
     }
     
-    # Check if API_KEY line doesn't exist at all
-    if (-not $envContent | Where-Object { $_ -match "^\s*API_KEY\s*=" }) {
-        $needsApiKey = $true
+    # Check if API_KEY line doesn't exist at all (only if we didn't already find it)
+    if (-not $apiKeySet) {
+        if (-not ($envContent | Where-Object { $_ -match "^\s*API_KEY\s*=" })) {
+            $needsApiKey = $true
+        }
     }
 } else {
     # File doesn't exist, create it
