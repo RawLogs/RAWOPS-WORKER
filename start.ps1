@@ -7,24 +7,6 @@ Set-Location $ScriptDir
 
 Write-Host "Starting RAWOPS-WORKER..." -ForegroundColor Green
 
-# Check if git is installed
-try {
-    git --version | Out-Null
-    Write-Host "Git is installed." -ForegroundColor Green
-} catch {
-    Write-Host "Git is not installed." -ForegroundColor Yellow
-    $installGit = Read-Host "Do you want to install it now using winget? (y/n)"
-    if ($installGit -eq 'y') {
-        Write-Host "Installing Git..." -ForegroundColor Cyan
-        winget install --id Git.Git -e --source winget
-        Write-Host "Git installed successfully. Please restart the terminal and run the script again." -ForegroundColor Green
-        exit 0
-    } else {
-        Write-Host "Please install Git to continue." -ForegroundColor Red
-        exit 1
-    }
-}
-
 # Auto-update logic
 Write-Host "Checking for updates..." -ForegroundColor Cyan
 git fetch origin
