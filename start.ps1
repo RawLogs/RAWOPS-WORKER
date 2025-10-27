@@ -7,21 +7,78 @@ Set-Location $ScriptDir
 
 Write-Host "Starting RAWOPS-WORKER..." -ForegroundColor Green
 
+# Check if git is installed
+try {
+    git --version | Out-Null
+    Write-Host "Git is installed." -ForegroundColor Green
+} catch {
+    Write-Host "Git is not installed." -ForegroundColor Yellow
+    $installGit = Read-Host "Do you want to install it now using winget? (y/n)"
+    if ($installGit -eq 'y') {
+        Write-Host "Installing Git..." -ForegroundColor Cyan
+        winget install --id Git.Git -e --source winget
+        Write-Host "Git installed successfully. Please restart the terminal and run the script again." -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "Please install Git to continue." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Auto-update logic
+Write-Host "Checking for updates..." -ForegroundColor Cyan
+git fetch origin
+$local = git rev-parse HEAD
+$remote = git rev-parse '@{u}'
+
+if ($local -ne $remote) {
+    Write-Host "New version available. Updating..." -ForegroundColor Yellow
+    $currentBranch = git rev-parse --abbrev-ref HEAD
+    git reset --hard "origin/$currentBranch"
+    git pull
+    Write-Host "Update complete." -ForegroundColor Green
+} else {
+    Write-Host "Already up to date." -ForegroundColor Green
+}
+
+# Check if node is installed
+try {
+    node --version | Out-Null
+    Write-Host "Node.js is installed." -ForegroundColor Green
+} catch {
+    Write-Host "Node.js is not installed." -ForegroundColor Yellow
+    $installNode = Read-Host "Do you want to install it now using winget? (y/n)"
+    if ($installNode -eq 'y') {
+        Write-Host "Installing Node.js LTS..." -ForegroundColor Cyan
+        winget install OpenJS.NodeJS.LTS
+        Write-Host "Node.js installed successfully. Please restart the terminal and run the script again." -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "Please install Node.js to continue." -ForegroundColor Red
+        exit 1
+    }
+}
+
 # Check if pnpm is installed
 try {
     $pnpmVersion = pnpm --version
-    Write-Host "pnpm version: $pnpmVersion" -ForegroundColor Cyan
+    Write-Host "pnpm version: $($pnpmVersion)" -ForegroundColor Cyan
 } catch {
-    Write-Host "Error: pnpm is not installed or not in PATH" -ForegroundColor Red
-    Write-Host "Please install pnpm: npm install -g pnpm" -ForegroundColor Yellow
-    exit 1
+    Write-Host "pnpm is not installed." -ForegroundColor Yellow
+    $installPnpm = Read-Host "Do you want to install it now using npm? (y/n)"
+    if ($installPnpm -eq 'y') {
+        Write-Host "Installing pnpm globally..." -ForegroundColor Cyan
+        npm install -g pnpm
+        Write-Host "pnpm installed successfully." -ForegroundColor Green
+    } else {
+        Write-Host "Please install pnpm to continue: npm install -g pnpm" -ForegroundColor Red
+        exit 1
+    }
 }
 
-# Check if node_modules exists
-if (-Not (Test-Path "node_modules")) {
-    Write-Host "Installing dependencies..." -ForegroundColor Yellow
-    pnpm install
-}
+# Always run pnpm install to ensure dependencies are up to date
+Write-Host "Installing/updating dependencies..." -ForegroundColor Yellow
+pnpm install
 
 # Check API_KEY configuration
 $envFile = ".env.local"
@@ -64,6 +121,14 @@ if (Test-Path $envFile) {
     # File doesn't exist, create it
     $fullPath = Join-Path $ScriptDir $envFile
     Write-Host "Creating .env.local file..." -ForegroundColor Yellow
+    
+    # Create directory if it doesn't exist
+    $dirPath = Split-Path -Parent $envFile
+    if (-not (Test-Path $dirPath)) {
+        New-Item -Path $dirPath -ItemType Directory -Force | Out-Null
+        Write-Host "Created directory: $dirPath" -ForegroundColor Cyan
+    }
+    
     New-Item -Path $envFile -ItemType File -Force | Out-Null
     
     # Add default content
@@ -142,7 +207,7 @@ if ($envContent) {
 
 # Start the application
 Write-Host ""
-Write-Host "Starting RAWOPS-WORKER..." -ForegroundColor Green
+Write-Host "Starting RAWOPS-WORKER worker..." -ForegroundColor Green
 Write-Host ""
 pnpm start
 
