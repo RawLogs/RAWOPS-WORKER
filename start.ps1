@@ -76,9 +76,16 @@ try {
     }
 }
 
+
 # Always run pnpm install to ensure dependencies are up to date
 Write-Host "Installing/updating dependencies..." -ForegroundColor Yellow
-pnpm install
+$hasInstalledWorker = Read-Host "Have you already installed the worker? (y/n)"
+if ($hasInstalledWorker -eq 'y') {
+    Write-Host "Skipping pnpm install." -ForegroundColor Cyan
+} else {
+    Write-Host "Installing dependencies with pnpm..." -ForegroundColor Cyan
+    pnpm install
+}
 
 # Check API_KEY configuration
 $envFile = ".env.local"
