@@ -61,7 +61,7 @@ try {
 
 # Always run pnpm install to ensure dependencies are up to date
 Write-Host "Installing/updating dependencies..." -ForegroundColor Yellow
-$hasInstalledWorker = Read-Host "Nếu cài Worker rồi thì nhập y, nếu chưa cài thì nhập n? (y/n)"
+$hasInstalledWorker = Read-Host "Neu cai worker roi thi nhap Y, chua thi N? (y/n)"
 if ($hasInstalledWorker -eq 'y') {
     Write-Host "Skipping pnpm install." -ForegroundColor Cyan
 } else {
