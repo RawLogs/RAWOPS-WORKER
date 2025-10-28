@@ -603,7 +603,6 @@ async function loadUserCommentSettings(profileId, userId) {
             if (userSettings.aiCommentEnabled) {
                 console.log(`[Worker] Fetching prompt settings from database...`);
                 const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
-                console.log(`[Worker] Prompt settings:`, promptSettings);
                 if (promptSettings) {
                     userSettings.databasePrompt = {
                         finalPrompt: promptSettings.finalPrompt,

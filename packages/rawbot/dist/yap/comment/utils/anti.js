@@ -78,7 +78,6 @@ async function performRandomScrollPattern(driver, scrollOps, commentOps) {
             }
         ];
         const randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
-        console.log(`[YapComment] [AntiDetection] Using ${randomPattern.name} scroll pattern (min height: ${randomPattern.minScrollHeight}px)...`);
         await scrollOps.smoothScrollWithResult({
             duration: randomPattern.duration,
             steps: randomPattern.steps,
@@ -99,7 +98,6 @@ async function performRandomScrollPattern(driver, scrollOps, commentOps) {
  */
 async function scrollToFindComments(driver, scrollOps, extractionOps, commentOps) {
     try {
-        console.log('[YapComment] [AntiDetection] Scrolling to find comments...');
         // Scroll down to see more comments
         await scrollOps.smoothScrollWithResult({
             duration: 4000,
@@ -145,7 +143,6 @@ async function performIdleScroll(driver, scrollOps, commentOps) {
         // Random idle scrolling to simulate human behavior
         const shouldIdleScroll = Math.random() < 0.3; // 30% chance
         if (shouldIdleScroll) {
-            console.log('[YapComment] [AntiDetection] Performing idle scroll...');
             await scrollOps.smoothScrollWithResult({
                 duration: 2000,
                 steps: 4,
@@ -161,7 +158,7 @@ async function performIdleScroll(driver, scrollOps, commentOps) {
         }
     }
     catch (error) {
-        console.log('[YapComment] Error performing idle scroll:', error);
+        console.log('[YapComment] Error performing idle scroll:');
     }
 }
 /**

@@ -238,42 +238,69 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
         // Submit logs to interaction logs API
         if (sessionId) {
             try {
-                // Get latest log timestamp to only submit newer cache entries
-                const latestLogTimestamp = await getLatestLogTimestamp(sessionId, profileId);
-                // Filter cache entries to only include newer ones
-                const filteredDoneLinks = doneLinks.filter((item) => {
-                    const cacheTimestamp = new Date(item.timestamp);
-                    return !latestLogTimestamp || cacheTimestamp > latestLogTimestamp;
+                // Get all links from original input instead of cache
+                const originalInputLinks = processedSettings?.links || [];
+                if (originalInputLinks.length === 0) {
+                    console.log(`[YapComment] No original input links to check`);
+                    return;
+                }
+                // Step 1: Get list of links that are NOT already in database with DONE status
+                console.log(`[YapComment] Checking pending links from ${originalInputLinks.length} total input links...`);
+                const pendingResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs/pending`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        profileId: profileId,
+                        links: originalInputLinks
+                    }),
+                    signal: AbortSignal.timeout(10000) // 10 second timeout
                 });
-                const filteredFailedLinks = failedLinks.filter((item) => {
-                    const cacheTimestamp = new Date(item.timestamp);
-                    return !latestLogTimestamp || cacheTimestamp > latestLogTimestamp;
-                });
-                console.log(`[YapComment] Cache filtering: ${filteredDoneLinks.length} done, ${filteredFailedLinks.length} failed`);
-                // Only submit if there are new logs
+                let pendingLinks = [];
+                let existingCount = 0;
+                let pendingCount = 0;
+                if (pendingResponse.ok) {
+                    const pendingData = await pendingResponse.json();
+                    pendingLinks = pendingData.pendingLinks;
+                    existingCount = pendingData.existingCount;
+                    pendingCount = pendingData.pendingCount;
+                    console.log(`[YapComment] ✅ Pending check: ${existingCount} existing in DB, ${pendingCount} pending`);
+                }
+                else {
+                    console.warn(`[YapComment] Failed to check pending links: ${pendingResponse.status}`);
+                    // Fallback: use all cache links if API fails
+                    pendingLinks = originalInputLinks;
+                    pendingCount = originalInputLinks.length;
+                }
+                if (pendingLinks.length === 0) {
+                    console.log(`[YapComment] No pending links found - all links already exist in database`);
+                    return;
+                }
+                // Step 2: Filter cache to only include links that:
+                // - Are in pendingLinks (not in DB or not DONE in DB)
+                // - AND have data in cache (done.json or failed.json)
+                console.log(`[YapComment] Filtering cache: ${doneLinks.length} done in cache, ${failedLinks.length} failed in cache`);
+                const pendingLinksSet = new Set(pendingLinks);
+                // Filter cache entries to only include links that are BOTH:
+                // 1. In pending list (need to be submitted)
+                // 2. In cache (already processed)
+                const filteredDoneLinks = doneLinks.filter((item) => pendingLinksSet.has(item.url));
+                const filteredFailedLinks = failedLinks.filter((item) => pendingLinksSet.has(item.url));
+                console.log(`[YapComment] 📊 Cache filtering results:`);
+                console.log(`   - Pending links from API: ${pendingLinks.length}`);
+                console.log(`   - Done links in cache matching pending: ${filteredDoneLinks.length}`);
+                console.log(`   - Failed links in cache matching pending: ${filteredFailedLinks.length}`);
+                console.log(`   - Total to submit: ${filteredDoneLinks.length + filteredFailedLinks.length}`);
+                // Step 3: Only submit if there are links that meet the criteria
                 if (filteredDoneLinks.length === 0 && filteredFailedLinks.length === 0) {
-                    console.log(`[YapComment] No new logs to submit, all cache entries are older than latest log`);
+                    console.log(`[YapComment] No cache entries match pending links - nothing to submit`);
                     return;
                 }
-                // Check for existing logs to avoid duplicates (only for new entries)
-                const allNewLinks = [...filteredDoneLinks.map((item) => item.url), ...filteredFailedLinks.map((item) => item.url)];
-                const existingLinksMap = await checkExistingLogs(sessionId, profileId, allNewLinks);
-                // Filter logic: Only skip links that are already DONE, allow FAIL->DONE updates
-                const newDoneLinks = filteredDoneLinks.filter((item) => {
-                    const existingStatus = existingLinksMap.get(item.url);
-                    // Only skip if already DONE, allow FAIL->DONE updates
-                    return existingStatus !== 'DONE';
-                });
-                // Always submit failed links for retry (don't filter them)
+                const newDoneLinks = filteredDoneLinks;
                 const newFailedLinks = filteredFailedLinks;
-                const doneCount = Array.from(existingLinksMap.values()).filter(status => status === 'DONE').length;
-                const failToDoneCount = Array.from(existingLinksMap.values()).filter(status => status === 'FAIL').length;
-                console.log(`[YapComment] Submitting: ${newDoneLinks.length} done (${failToDoneCount} FAIL→DONE), ${newFailedLinks.length} failed`);
-                // Only submit if there are new logs (done or failed)
-                if (newDoneLinks.length === 0 && newFailedLinks.length === 0) {
-                    console.log(`[YapComment] No new logs to submit, all links already exist`);
-                    return;
-                }
+                console.log(`[YapComment] 🚀 Submitting to interaction-logs API: ${newDoneLinks.length} done, ${newFailedLinks.length} failed`);
                 const logs = [
                     ...newDoneLinks.map((item) => ({
                         link: item.url,
@@ -281,10 +308,9 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
                         action: 'SUCCESS',
                         status: 'DONE',
                         details: {
-                            timestamp: item.timestamp,
+                            timestamp: new Date().toISOString(),
                             commentPosted: item.commented || false,
-                            likePosted: item.liked || false,
-                            replyPosted: item.replied || false
+                            likePosted: item.liked || false
                         }
                     })),
                     ...newFailedLinks.map((item) => {
@@ -295,7 +321,7 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
                             action: 'FAILED',
                             status: 'FAIL',
                             details: {
-                                timestamp: item.timestamp,
+                                timestamp: new Date().toISOString(),
                                 reason: errorText,
                                 error: errorText
                             }

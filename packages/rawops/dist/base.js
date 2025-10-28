@@ -120,10 +120,6 @@ class BaseOps {
                     console.log('[BaseOps] Pausing to think...');
                     await this.driver.sleep(thinkingDelay);
                 }
-                // Show progress every 10 characters
-                if ((i + 1) % 10 === 0) {
-                    console.log(`[BaseOps] Typed ${i + 1}/${text.length} characters`);
-                }
             }
             console.log('[BaseOps] Finished typing comment character by character');
             return true;
@@ -168,13 +164,8 @@ class BaseOps {
                 await this.driver.sleep(wordDelay);
                 // Special handling for @ mentions
                 if (word.startsWith('@')) {
-                    console.log(`[BaseOps] Typed @ mention: ${word}`);
                     // Extra delay after @ mentions to let X.com process it
                     await this.driver.sleep(100);
-                }
-                // Show progress every 5 words
-                if ((i + 1) % 5 === 0) {
-                    console.log(`[BaseOps] Typed ${i + 1}/${words.length} words`);
                 }
             }
             // Final verification - check if text was actually typed

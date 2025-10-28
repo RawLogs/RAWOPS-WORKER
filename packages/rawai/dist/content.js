@@ -59,7 +59,6 @@ class ContentAI extends base_1.BaseAI {
             // NO FALLBACK - All prompts must come from database
             throw new Error('No database prompt provided. All prompts must come from database - no hardcoded fallbacks allowed.');
         }
-        console.log(`[ContentAI] Prompt =============================:`, prompt);
         const result = await this.generateWithRetry(prompt);
         if (result.success && result.content) {
             result.content = this.cleanContent(result.content);
