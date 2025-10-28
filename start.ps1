@@ -5,38 +5,38 @@
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
-Write-Host "Đang khởi động RAWOPS-WORKER..." -ForegroundColor Green
+Write-Host "Starting RAWOPS-WORKER..." -ForegroundColor Green
 
 # Auto-update logic
-Write-Host "Đang kiểm tra cập nhật..." -ForegroundColor Cyan
+Write-Host "Checking for updates..." -ForegroundColor Cyan
 git fetch origin
 $local = git rev-parse HEAD
 $remote = git rev-parse '@{u}'
 
 if ($local -ne $remote) {
-    Write-Host "Có phiên bản mới. Đang cập nhật..." -ForegroundColor Yellow
+    Write-Host "New version available. Updating..." -ForegroundColor Yellow
     $currentBranch = git rev-parse --abbrev-ref HEAD
     git reset --hard "origin/$currentBranch"
     git pull
-    Write-Host "Cập nhật hoàn tất." -ForegroundColor Green
+    Write-Host "Update complete." -ForegroundColor Green
 } else {
-    Write-Host "Đã là phiên bản mới nhất." -ForegroundColor Green
+    Write-Host "Already up to date." -ForegroundColor Green
 }
 
 # Check if node is installed
 try {
     node --version | Out-Null
-    Write-Host "Đã cài đặt Node.js." -ForegroundColor Green
+    Write-Host "Node.js is installed." -ForegroundColor Green
 } catch {
-    Write-Host "Chưa cài đặt Node.js." -ForegroundColor Yellow
-    $installNode = Read-Host "Bạn có muốn cài đặt ngay bằng winget? (y/n)"
+    Write-Host "Node.js is not installed." -ForegroundColor Yellow
+    $installNode = Read-Host "Do you want to install it now using winget? (y/n)"
     if ($installNode -eq 'y') {
-        Write-Host "Đang cài đặt Node.js LTS..." -ForegroundColor Cyan
+        Write-Host "Installing Node.js LTS..." -ForegroundColor Cyan
         winget install OpenJS.NodeJS.LTS
-        Write-Host "Cài đặt Node.js thành công. Vui lòng khởi động lại terminal và chạy script lại." -ForegroundColor Green
+        Write-Host "Node.js installed successfully. Please restart the terminal and run the script again." -ForegroundColor Green
         exit 0
     } else {
-        Write-Host "Vui lòng cài đặt Node.js để tiếp tục." -ForegroundColor Red
+        Write-Host "Please install Node.js to continue." -ForegroundColor Red
         exit 1
     }
 }
@@ -44,28 +44,28 @@ try {
 # Check if pnpm is installed
 try {
     $pnpmVersion = pnpm --version
-    Write-Host "Phiên bản pnpm: $($pnpmVersion)" -ForegroundColor Cyan
+    Write-Host "pnpm version: $($pnpmVersion)" -ForegroundColor Cyan
 } catch {
-    Write-Host "Chưa cài đặt pnpm." -ForegroundColor Yellow
-    $installPnpm = Read-Host "Bạn có muốn cài đặt ngay bằng npm? (y/n)"
+    Write-Host "pnpm is not installed." -ForegroundColor Yellow
+    $installPnpm = Read-Host "Do you want to install it now using npm? (y/n)"
     if ($installPnpm -eq 'y') {
-        Write-Host "Đang cài đặt pnpm toàn cục..." -ForegroundColor Cyan
+        Write-Host "Installing pnpm globally..." -ForegroundColor Cyan
         npm install -g pnpm
-        Write-Host "Cài đặt pnpm thành công." -ForegroundColor Green
+        Write-Host "pnpm installed successfully." -ForegroundColor Green
     } else {
-        Write-Host "Vui lòng cài đặt pnpm để tiếp tục: npm install -g pnpm" -ForegroundColor Red
+        Write-Host "Please install pnpm to continue: npm install -g pnpm" -ForegroundColor Red
         exit 1
     }
 }
 
 
 # Always run pnpm install to ensure dependencies are up to date
-Write-Host "Đang cài đặt/cập nhật dependencies..." -ForegroundColor Yellow
-$hasInstalledWorker = Read-Host "Nếu đã cài WORKER lần đầu rồi thì YES, nếu chưa thì NO? (y/n)"
+Write-Host "Installing/updating dependencies..." -ForegroundColor Yellow
+$hasInstalledWorker = Read-Host "Nếu cài Worker rồi thì nhập y, nếu chưa cài thì nhập n? (y/n)"
 if ($hasInstalledWorker -eq 'y') {
-    Write-Host "Bỏ qua cài đặt pnpm." -ForegroundColor Cyan
+    Write-Host "Skipping pnpm install." -ForegroundColor Cyan
 } else {
-    Write-Host "Đang cài đặt dependencies bằng pnpm..." -ForegroundColor Cyan
+    Write-Host "Installing dependencies with pnpm..." -ForegroundColor Cyan
     pnpm install
 }
 
@@ -83,15 +83,15 @@ if (Test-Path $envFile) {
     foreach ($line in $envContent) {
         if ($line -match "^\s*API_KEY\s*=\s*(.+)$") {
             $apiKeyValue = $matches[1].Trim()
-            Write-Host "Đã tìm thấy API_KEY trong .env.local (độ dài: $($apiKeyValue.Length))" -ForegroundColor Cyan
+            Write-Host "Found API_KEY in .env.local (length: $($apiKeyValue.Length))" -ForegroundColor Cyan
             
             if ([string]::IsNullOrWhiteSpace($apiKeyValue) -or $apiKeyValue -eq '...' -or $apiKeyValue -eq 'your_api_key_here' -or $apiKeyValue -eq 'your_api_key_from_website') {
-                Write-Host "API_KEY không hợp lệ: '$apiKeyValue'" -ForegroundColor Yellow
+                Write-Host "API_KEY is invalid: '$apiKeyValue'" -ForegroundColor Yellow
                 $needsApiKey = $true
                 $apiKeySet = $true
                 break
             } else {
-                Write-Host "API_KEY hợp lệ" -ForegroundColor Green
+                Write-Host "API_KEY is valid" -ForegroundColor Green
                 # Valid API_KEY found, don't need to prompt
                 $needsApiKey = $false
                 $apiKeySet = $true
@@ -109,13 +109,13 @@ if (Test-Path $envFile) {
 } else {
     # File doesn't exist, create it
     $fullPath = Join-Path $ScriptDir $envFile
-    Write-Host "Đang tạo file .env.local..." -ForegroundColor Yellow
+    Write-Host "Creating .env.local file..." -ForegroundColor Yellow
     
     # Create directory if it doesn't exist
     $dirPath = Split-Path -Parent $envFile
     if (-not (Test-Path $dirPath)) {
         New-Item -Path $dirPath -ItemType Directory -Force | Out-Null
-        Write-Host "Đã tạo thư mục: $dirPath" -ForegroundColor Cyan
+        Write-Host "Created directory: $dirPath" -ForegroundColor Cyan
     }
     
     New-Item -Path $envFile -ItemType File -Force | Out-Null
@@ -126,7 +126,7 @@ WEB_API_URL=https://rawops.net/api
 API_KEY=your_api_key_here
 "@
     Set-Content -Path $envFile -Value $defaultContent
-    Write-Host "Đã tạo $fullPath với giá trị mặc định" -ForegroundColor Cyan
+    Write-Host "Created $fullPath with default values" -ForegroundColor Cyan
     $needsApiKey = $true
 }
 
@@ -134,20 +134,20 @@ API_KEY=your_api_key_here
 if ($needsApiKey) {
     Write-Host ""
     Write-Host "================================================" -ForegroundColor Yellow
-    Write-Host "API_KEY bị thiếu hoặc không hợp lệ!" -ForegroundColor Red
+    Write-Host "API_KEY is missing or invalid!" -ForegroundColor Red
     Write-Host "================================================" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Lấy API key từ: https://rawops.net/" -ForegroundColor Cyan
-    Write-Host "1. Truy cập https://rawops.net/" -ForegroundColor White
-    Write-Host "2. Đăng nhập vào tài khoản YAP Suite của bạn" -ForegroundColor White
-    Write-Host "3. Điều hướng đến phần 'MY API KEY'" -ForegroundColor White
-    Write-Host "4. Sao chép API key của bạn" -ForegroundColor White
+    Write-Host "Get your API key from: https://rawops.net/" -ForegroundColor Cyan
+    Write-Host "1. Visit https://rawops.net/" -ForegroundColor White
+    Write-Host "2. Sign in to your YAP Suite account" -ForegroundColor White
+    Write-Host "3. Navigate to 'MY API KEY' section" -ForegroundColor White
+    Write-Host "4. Copy your API key" -ForegroundColor White
     Write-Host ""
     
-    $apiKey = Read-Host "Nhập API_KEY của bạn" 
+    $apiKey = Read-Host "Enter your API_KEY" 
     
     if ([string]::IsNullOrWhiteSpace($apiKey)) {
-        Write-Host "API_KEY là bắt buộc!" -ForegroundColor Red
+        Write-Host "API_KEY is required!" -ForegroundColor Red
         exit 1
     }
     
@@ -172,7 +172,7 @@ if ($needsApiKey) {
     
     Set-Content -Path $envFile -Value $newContent
     Write-Host ""
-    Write-Host "✅ Đã lưu API_KEY vào $envFile" -ForegroundColor Green
+    Write-Host "✅ API_KEY saved to $envFile" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -188,25 +188,24 @@ if ($envContent) {
     }
     
     if (-not $hasWebApiUrl) {
-        Write-Host "Đang thêm WEB_API_URL vào .env.local..." -ForegroundColor Yellow
+        Write-Host "Adding WEB_API_URL to .env.local..." -ForegroundColor Yellow
         Add-Content -Path $envFile -Value "WEB_API_URL=https://rawops.net/api"
-        Write-Host "✅ Đã thêm WEB_API_URL" -ForegroundColor Green
+        Write-Host "✅ WEB_API_URL added" -ForegroundColor Green
     }
 }
 
 # Start the application
 Write-Host ""
-Write-Host "Đang khởi động worker RAWOPS-WORKER..." -ForegroundColor Green
+Write-Host "Starting RAWOPS-WORKER worker..." -ForegroundColor Green
 Write-Host ""
 pnpm start
 
 # Check exit code
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
-    Write-Host "Ứng dụng kết thúc với mã lỗi: $LASTEXITCODE" -ForegroundColor Red
+    Write-Host "Application exited with error code: $LASTEXITCODE" -ForegroundColor Red
     exit $LASTEXITCODE
 }
 
 Write-Host ""
-Write-Host "Ứng dụng đã đóng." -ForegroundColor Green
-
+Write-Host "Application closed." -ForegroundColor Green
