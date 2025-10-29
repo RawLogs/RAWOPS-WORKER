@@ -24,21 +24,40 @@ if ($local -ne $remote) {
 }
 
 # Check if node is installed
-try {
-    node --version | Out-Null
-    Write-Host "Node.js is installed." -ForegroundColor Green
-} catch {
-    Write-Host "Node.js is not installed." -ForegroundColor Yellow
-    $installNode = Read-Host "Do you want to install it now using winget? (y/n)"
-    if ($installNode -eq 'y') {
-        Write-Host "Installing Node.js LTS..." -ForegroundColor Cyan
-        winget install OpenJS.NodeJS.LTS
-        Write-Host "Node.js installed successfully. Please restart the terminal and run the script again." -ForegroundColor Green
-        exit 0
-    } else {
-        Write-Host "Please install Node.js to continue." -ForegroundColor Red
-        exit 1
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if ($nodeCmd) {
+    $nodeVersion = node --version
+    Write-Host "Node.js is installed: $nodeVersion" -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "================================================" -ForegroundColor Yellow
+    Write-Host "Node.js is not installed!" -ForegroundColor Red
+    Write-Host "================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please install Node.js LTS to continue:" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "1. Visit: https://nodejs.org/" -ForegroundColor White
+    Write-Host "2. Download the LTS version (Long Term Support)" -ForegroundColor White
+    Write-Host "3. Run the installer and follow the setup wizard" -ForegroundColor White
+    Write-Host "4. Restart your terminal after installation" -ForegroundColor White
+    Write-Host "5. Run this script again" -ForegroundColor White
+    Write-Host ""
+    
+    # Try to open browser automatically
+    $openBrowser = Read-Host "Would you like to open the Node.js download page now? (y/n)"
+    if ($openBrowser -eq 'y' -or $openBrowser -eq 'Y') {
+        try {
+            Start-Process "https://nodejs.org/dist/v25.1.0/node-v25.1.0-x64.msi"
+            Write-Host "Browser opened. Please download and install Node.js, then restart terminal." -ForegroundColor Cyan
+        } catch {
+            Write-Host "Could not open browser automatically." -ForegroundColor Yellow
+            Write-Host "Please manually visit: https://nodejs.org/" -ForegroundColor Cyan
+        }
     }
+    
+    Write-Host ""
+    Write-Host "Exiting..." -ForegroundColor Yellow
+    exit 1
 }
 
 # Check if pnpm is installed
