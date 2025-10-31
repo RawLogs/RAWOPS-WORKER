@@ -1,0 +1,61 @@
+name: 🛡️ RAWOPS Security & Integrity Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * 1' 
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # 1️⃣ Static Code Analysis (CodeQL)
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  # 2️⃣ Secret & Key Leak Detection
+  gitleaks:
+    name: Secret Leak Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for secrets
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          args: --verbose --redact
+
+  # 3️⃣ Dependency Vulnerability Audit
+  dependencies:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - run: npm audit --audit-level=high
+
+  # 4️⃣ Code Quality Check
+  lint:
+    name: ESLint Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
