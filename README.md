@@ -32,7 +32,31 @@ AI automation worker với Selenium và local browser cho Twitter automation.
 
 Cách nhanh nhất để bắt đầu:
 
-### Bước 1: Tải và Giải nén Chromium Browser
+### Bước 1: Tải Chromium/ChromeDriver
+
+**Cách 1: Sử dụng script tự động (Khuyến nghị)**
+
+#### Windows:
+1. Mở thư mục `RAWOPS-WORKER`
+2. **Chuột phải vào file `win_chrome_downloader.bat`** → Chọn **Run as administrator** (hoặc double-click)
+3. Script sẽ tự động tải và cài đặt ChromeDriver vào thư mục `chromium/`
+4. Đợi quá trình tải hoàn tất
+
+#### macOS/Linux:
+1. Mở Terminal
+2. Di chuyển đến thư mục `RAWOPS-WORKER`:
+   ```bash
+   cd /đường/dẫn/đến/RAWOPS-WORKER
+   ```
+3. Cấp quyền thực thi và chạy script:
+   ```bash
+   chmod +x macos_chrome_downloader.sh
+   ./macos_chrome_downloader.sh
+   ```
+4. Trả lời câu hỏi "Da co chromedriver chua? (y/n)" → Nhấn `n` nếu chưa có
+5. Script sẽ tự động phát hiện phiên bản Chrome và tải ChromeDriver phù hợp vào thư mục `chromium/`
+
+**Cách 2: Tải thủ công**
 1. [Tải Chromium](https://cdn.rawops.net/f/orHj/chromium.zip)
 2. Mở thư mục RAWOPS-WORKER (nơi bạn đã giải nén project)
 3. **Tạo thư mục `chromium`**:
@@ -45,11 +69,7 @@ Cách nhanh nhất để bắt đầu:
    - Chọn thư mục `chromium` vừa tạo làm nơi giải nén
    - Click **Extract** để giải nén
 
-### Bước 2: Tạo thư mục profiles
-1. Mở thư mục RAWOPS-WORKER
-2. Click chuột phải vào khoảng trống
-3. Chọn **New** → **Folder**
-4. Đặt tên là `profiles`
+
 
 ### Bước 3: Chạy Worker
 1. Mở thư mục RAWOPS-WORKER
@@ -106,9 +126,33 @@ cp example .env.local
 ```
 
 ### 5. Tải Chromium Browser
- [Tỉa](https://cdn.rawops.net/f/orHj/chromium.zip)
+
+**Cách 1: Sử dụng script tự động (Khuyến nghị)**
+
+#### Windows:
 ```bash
-# Và giải nén cho thư mục chromium/
+# Chạy script tự động (Run as administrator)
+win_chrome_downloader.bat
+
+# Script sẽ tự động tải ChromeDriver phù hợp với phiên bản Chrome của bạn
+```
+
+#### macOS/Linux:
+```bash
+# Cấp quyền thực thi
+chmod +x macos_chrome_downloader.sh
+
+# Chạy script
+./macos_chrome_downloader.sh
+
+# Trả lời "n" nếu chưa có ChromeDriver
+# Script sẽ tự động phát hiện phiên bản Chrome và tải ChromeDriver
+```
+
+**Cách 2: Tải thủ công**
+```bash
+# Tải từ link: https://cdn.rawops.net/f/orHj/chromium.zip
+# Và giải nén vào thư mục chromium/
 ```
 
 ### 6. Tạo Profiles Directory
