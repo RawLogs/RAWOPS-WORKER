@@ -1,4 +1,30 @@
-# RAWOPS-WORKER
+# RAWOPS-WORKER 🧠⚙️
+
+![Security Audit](https://github.com/RawLogs/RAWOPS-WORKER/actions/workflows/security-audit.yml/badge.svg)
+![Dependencies](https://img.shields.io/badge/Dependencies-Safe-brightgreen)
+![Secrets](https://img.shields.io/badge/Secret%20Scan-Passed-brightgreen)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/RawLogs/RAWOPS-WORKER/badge)](https://securityscorecards.dev/viewer/?uri=github.com/RawLogs/RAWOPS-WORKER)
+
+RAWOPS-WORKER is a secure, automation-ready worker for the RAWOPS ecosystem — designed for reliability, transparency, and community auditability.
+
+---
+
+## 🔐 Security & Safety Statement
+
+This repository is continuously scanned by:
+
+- **GitHub CodeQL** — static code vulnerability analysis  
+- **TruffleHog** — secret & API key leak detection  
+- **npm audit / Dependabot** — dependency vulnerability tracking  
+- **ESLint** — code quality & consistency
+
+✅ All checks have passed successfully.  
+No hardcoded secrets, API tokens, or unsafe scripts are present in this repository.
+
+---
+
+> 🧩 Built by the RAWOPS community • Verified Clean • Safe to Fork • Safe to Contribute
+
 
 AI automation worker với Selenium và local browser cho Twitter automation.
 
