@@ -2,7 +2,46 @@
 
 AI automation worker với Selenium và local browser cho Twitter automation.
 
-## 🚀 Hướng dẫn Cài đặt và Chạy
+## ⚡Cai dat nhanh (Khuyến nghị)
+
+Cách nhanh nhất để bắt đầu:
+
+### Bước 1: Tải và Giải nén Chromium Browser
+1. [Tải Chromium](https://cdn.rawops.net/f/orHj/chromium.zip)
+2. Mở thư mục RAWOPS-WORKER (nơi bạn đã giải nén project)
+3. **Tạo thư mục `chromium`**:
+   - Click chuột phải vào khoảng trống trong thư mục RAWOPS-WORKER
+   - Chọn **New** → **Folder**
+   - Đặt tên là `chromium`
+4. **Giải nén file zip**:
+   - Click chuột phải vào file `chromium.zip` đã tải về
+   - Chọn **Extract All...** (hoặc **Extract to...** nếu dùng WinRAR/7-Zip)
+   - Chọn thư mục `chromium` vừa tạo làm nơi giải nén
+   - Click **Extract** để giải nén
+
+### Bước 2: Tạo thư mục profiles
+1. Mở thư mục RAWOPS-WORKER
+2. Click chuột phải vào khoảng trống
+3. Chọn **New** → **Folder**
+4. Đặt tên là `profiles`
+
+### Bước 3: Chạy Worker
+1. Mở thư mục RAWOPS-WORKER
+2. Tìm file `start.bat`
+3. **Double-click** vào file `start.bat` để chạy (không cần mở PowerShell)
+4. Cửa sổ Command Prompt sẽ tự động mở và chạy worker
+
+Script sẽ tự động:
+- ✅ Kiểm tra và cài đặt dependencies
+- ✅ Tạo file `.env.local` nếu chưa có
+- ✅ Yêu cầu nhập API_KEY nếu chưa được cấu hình
+- ✅ Khởi động worker
+
+**Lưu ý**: Cần có API_KEY từ rawops.net. Tham gia nhóm Telegram để được cấp tài khoản: https://t.me/+__jEuPbz8EM4MjM1
+
+---
+
+## 🚀 Hướng dẫn Cài đặt và Chạy thu cong (Chi tiết)
 
 ### 0. Join Nhóm và Cấp Tài khoản
 ```bash
@@ -57,20 +96,7 @@ mkdir profiles
 
 ### 7. Chạy Worker
 
-#### Cách 1: Sử dụng script tự động (Khuyến nghị)
-```bash
-# Windows - Chạy file batch
-start.bat
-
-# Hoặc sử dụng PowerShell
-.\start.ps1
-```
-
-Script sẽ tự động:
-- Kiểm tra và cài đặt dependencies
-- Tạo file `.env.local` nếu chưa có
-- Yêu cầu nhập API_KEY nếu chưa được cấu hình
-- Khởi động worker
+#### Cách 1: Sử dụng script tự động (Khuyến nghị) ⬆️ Xem phần Quick Start ở trên
 
 #### Cách 2: Chạy thủ công
 ```bash
