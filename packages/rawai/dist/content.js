@@ -135,13 +135,13 @@ class ContentAI extends base_1.BaseAI {
      */
     getRandomizedLength(originalLength) {
         const random = Math.random();
-        if (random <= 0.7) {
-            // 70% chance to use original setting
+        if (random <= 0.97) {
+            // 97% chance to use original setting
             return originalLength;
         }
         else {
-            // 30% chance to use other settings
-            const otherLengths = ['short', 'medium', 'long'].filter(l => l !== originalLength);
+            // 3% chance to use other settings
+            const otherLengths = ['short', 'medium'].filter(l => l !== originalLength);
             const randomIndex = Math.floor(Math.random() * otherLengths.length);
             return otherLengths[randomIndex];
         }

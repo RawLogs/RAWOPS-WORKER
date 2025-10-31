@@ -148,9 +148,25 @@ async function createAuthenticatedProxy(proxyConfig, profile) {
 function getChromeBinaryPath() {
     // Chrome is located outside the project root
     const projectRoot = path.join(__dirname, '..', '..', '..', '..');
-    return process.platform === 'win32'
-        ? path.join(projectRoot, 'chromium', 'chrome.exe')
-        : path.join(projectRoot, 'chromium', 'chrome');
+    switch (process.platform) {
+        case 'darwin': // macOS
+            // Check common Chrome locations on Mac
+            const macPaths = [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                path.join(projectRoot, 'chromium', 'chrome'),
+                path.join(process.env.HOME || '', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+            ];
+            for (const path of macPaths) {
+                if (fs.existsSync(path)) {
+                    return path;
+                }
+            }
+            throw new Error('Chrome browser not found. Please install Google Chrome.');
+        case 'win32': // Windows
+            return path.join(projectRoot, 'chromium', 'chrome.exe');
+        default: // Linux and others
+            return path.join(projectRoot, 'chromium', 'chrome');
+    }
 }
 /**
  * Setup browser with profile and proxy configuration
