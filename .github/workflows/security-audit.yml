@@ -26,15 +26,18 @@ jobs:
       - uses: github/codeql-action/analyze@v3
 
   # 2️⃣ Secret & Key Leak Detection
-  gitleaks:
-    name: Secret Leak Scan
+  secret-scan:
+    name: Secret Leak Scan (TruffleHog)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Scan for secrets
-        uses: zricethezav/gitleaks-action@v2
         with:
-          args: --verbose --redact
+          fetch-depth: 0  # Full history for secret scanning
+      - name: Run TruffleHog
+        run: |
+          docker run --rm -v "$PWD:/pwd" trufflesecurity/trufflehog:latest \
+            filesystem /pwd \
+            --only-verified
 
   # 3️⃣ Dependency Vulnerability Audit
   dependencies:
