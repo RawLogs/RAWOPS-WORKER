@@ -64,7 +64,7 @@ export declare function updateRemainingLinksAPI(profileId: string, remainingLink
  */
 export declare function bulkUpdateLinksStatusAPI(profileId: string, // Profile ID for API
 profileHandle: string, // Profile handle for cache directory
-doneLinks: string[], failedLinks: string[], originalLinks?: string[]): Promise<void>;
+doneLinks: string[], failedLinks: string[], originalLinks?: string[], runType?: string): Promise<void>;
 /**
  * Enhance error details using ErrorDriver for "Unknown error" cases
  */

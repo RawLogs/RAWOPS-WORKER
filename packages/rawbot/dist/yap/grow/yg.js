@@ -57,6 +57,7 @@ class YapGrow {
         this.runType = 'GROW';
         this.isClosed = false;
         this.context = {};
+        this.processedSettings = undefined;
         // Initialize the service
     }
     async initializeWithProfile(profile, proxyConfig) {
@@ -88,6 +89,7 @@ class YapGrow {
         const failedLinks = [];
         this.runId = run.id;
         this.runType = 'GROW';
+        this.processedSettings = { links: settings.links };
         try {
             if (!this.xClient || !this.drivers) {
                 throw new Error('XClient or Drivers not initialized');
@@ -772,7 +774,10 @@ class YapGrow {
         }
     }
     async close() {
+        // Set closed flag first
         this.isClosed = true;
+        // Submit cache before closing
+        await (0, utils_1.submitCacheToAPI)(this.cacheDir, this.profileId, this.runId, this.runType, this.processedSettings);
         if (this.xClient) {
             await this.xClient.close();
         }

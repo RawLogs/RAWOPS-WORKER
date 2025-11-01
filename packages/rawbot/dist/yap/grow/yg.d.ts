@@ -81,6 +81,7 @@ export declare class YapGrow {
     private runType;
     private isClosed;
     private context;
+    private processedSettings;
     constructor();
     initializeWithProfile(profile: any, proxyConfig?: any): Promise<void>;
     runYapGrowWorkflow(project: Project, run: Run, settings: YapGrowSettings): Promise<YapGrowResult>;
