@@ -248,9 +248,6 @@ class CommentByLink {
                         case 'tweet_unavailable':
                             errorMessage = `Tweet unavailable: ${errorDetail.message}`;
                             break;
-                        case 'rate_limited':
-                            errorMessage = `Rate limited: ${errorDetail.message}`;
-                            break;
                         default:
                             errorMessage = `Page error: ${errorDetail.message}`;
                     }

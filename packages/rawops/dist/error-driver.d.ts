@@ -1,6 +1,6 @@
 import { WebDriver } from 'selenium-webdriver';
 export interface ErrorDetail {
-    type: 'page_not_found' | 'account_suspended' | 'tweet_unavailable' | 'rate_limited' | 'unknown';
+    type: 'page_not_found' | 'account_suspended' | 'tweet_unavailable' | 'unknown';
     message: string;
     originalText: string;
     timestamp: string;

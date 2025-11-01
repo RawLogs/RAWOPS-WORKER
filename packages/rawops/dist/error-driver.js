@@ -127,9 +127,7 @@ class ErrorDriver {
             'this account doesn\'t exist',
             'this tweet is unavailable',
             'hmm...this page doesn\'t exist',
-            'something went wrong',
-            'rate limit',
-            'too many requests'
+            'something went wrong'
         ];
         return errorIndicators.some(indicator => lowerText.includes(indicator));
     }
@@ -169,11 +167,6 @@ class ErrorDriver {
                     xpath: "//*[contains(text(), 'Something went wrong')]",
                     type: 'unknown',
                     message: 'Something went wrong'
-                },
-                {
-                    xpath: "//*[contains(text(), 'rate limit') or contains(text(), 'Too many requests')]",
-                    type: 'rate_limited',
-                    message: 'Rate limited'
                 }
             ];
             for (const pattern of errorPatterns) {
@@ -232,9 +225,6 @@ class ErrorDriver {
         }
         if (text.includes('tweet is unavailable') || text.includes('unavailable') || text.includes('this tweet is unavailable')) {
             return 'tweet_unavailable';
-        }
-        if (text.includes('rate limit') || text.includes('too many requests')) {
-            return 'rate_limited';
         }
         return 'unknown';
     }

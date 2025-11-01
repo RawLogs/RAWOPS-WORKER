@@ -299,9 +299,6 @@ class CommentByProfile {
                         case 'tweet_unavailable':
                             errorMessage = `Profile unavailable: ${errorDetail.message}`;
                             break;
-                        case 'rate_limited':
-                            errorMessage = `Rate limited: ${errorDetail.message}`;
-                            break;
                         default:
                             errorMessage = `Profile error: ${errorDetail.message}`;
                     }
@@ -625,9 +622,6 @@ class CommentByProfile {
                             break;
                         case 'tweet_unavailable':
                             errorMessage = `Tweet unavailable: ${errorDetail.message}`;
-                            break;
-                        case 'rate_limited':
-                            errorMessage = `Rate limited: ${errorDetail.message}`;
                             break;
                         default:
                             errorMessage = `Page error: ${errorDetail.message}`;
