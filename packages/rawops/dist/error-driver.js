@@ -126,8 +126,7 @@ class ErrorDriver {
             'this account has been suspended',
             'this account doesn\'t exist',
             'this tweet is unavailable',
-            'hmm...this page doesn\'t exist',
-            'something went wrong'
+            'hmm...this page doesn\'t exist'
         ];
         return errorIndicators.some(indicator => lowerText.includes(indicator));
     }
@@ -162,11 +161,6 @@ class ErrorDriver {
                     xpath: "//*[contains(text(), 'Hmm...this page doesn')]",
                     type: 'page_not_found',
                     message: 'Page does not exist'
-                },
-                {
-                    xpath: "//*[contains(text(), 'Something went wrong')]",
-                    type: 'unknown',
-                    message: 'Something went wrong'
                 }
             ];
             for (const pattern of errorPatterns) {
