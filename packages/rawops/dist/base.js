@@ -191,6 +191,33 @@ class BaseOps {
             return await this.typeCharacterByCharacterElement(element, comment);
         }
     }
+    /**
+     * Find element by CSS selector with optional timeout
+     */
+    async findElementByCss(selector, timeout) {
+        if (timeout) {
+            return await (0, wait_utils_1.waitForElement)(this.driver, selector, timeout);
+        }
+        return await this.driver.findElement(selenium_webdriver_1.By.css(selector));
+    }
+    /**
+     * Find elements by CSS selector
+     */
+    async findElementsByCss(selector) {
+        return await this.driver.findElements(selenium_webdriver_1.By.css(selector));
+    }
+    /**
+     * Find element by XPath selector
+     */
+    async findElementByXpath(xpath) {
+        return await this.driver.findElement(selenium_webdriver_1.By.xpath(xpath));
+    }
+    /**
+     * Find elements by XPath selector
+     */
+    async findElementsByXpath(xpath) {
+        return await this.driver.findElements(selenium_webdriver_1.By.xpath(xpath));
+    }
     cleanExtractedContent(content, username) {
         if (!content)
             return content;

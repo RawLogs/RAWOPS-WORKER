@@ -260,6 +260,11 @@ async function checkAndCleanupStoppedRuns() {
             try {
                 // Check the current status of this run
                 const runStatus = await apiService.getRunStatus(runId);
+                // Handle null response (API error/timeout)
+                if (!runStatus) {
+                    // If we can't check the status, assume the run is still active
+                    continue;
+                }
                 // Only clean up browser if run is explicitly STOPPED or FAILED
                 if (runStatus.status === 'STOPPED' || runStatus.status === 'FAILED') {
                     console.log(`[${runId}] Run status changed to '${runStatus.status}', cleaning up browser`);
@@ -602,21 +607,31 @@ async function loadUserCommentSettings(profileId, userId) {
             // Get prompt settings from database if AI is enabled
             if (userSettings.aiCommentEnabled) {
                 console.log(`[Worker] Fetching prompt settings from database...`);
-                const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
-                if (promptSettings) {
-                    userSettings.databasePrompt = {
-                        finalPrompt: promptSettings.finalPrompt,
-                        requirePrompt: promptSettings.requirePrompt
-                    };
-                    // Add selectedPromptStyles from prompt settings
-                    if (promptSettings.selectedPromptStyles) {
-                        userSettings.selectedPromptStyles = promptSettings.selectedPromptStyles;
-                        console.log(`[Worker] Selected prompt styles loaded: ${promptSettings.selectedPromptStyles.length} styles`);
+                try {
+                    const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
+                    if (promptSettings && promptSettings.finalPrompt && promptSettings.requirePrompt) {
+                        userSettings.databasePrompt = {
+                            finalPrompt: promptSettings.finalPrompt,
+                            requirePrompt: promptSettings.requirePrompt
+                        };
+                        // Add selectedPromptStyles from prompt settings
+                        if (promptSettings.selectedPromptStyles) {
+                            userSettings.selectedPromptStyles = promptSettings.selectedPromptStyles;
+                            console.log(`[Worker] Selected prompt styles loaded: ${promptSettings.selectedPromptStyles.length} styles`);
+                        }
+                        console.log(`[Worker] Database prompt loaded successfully`);
                     }
-                    console.log(`[Worker] Database prompt loaded successfully`);
+                    else {
+                        console.error(`[Worker] ❌ No database prompt found or incomplete. AI comments will be disabled.`);
+                        console.error(`[Worker] Please ensure prompt_final table has a record with type='COMMENT' for this profile.`);
+                        userSettings.aiCommentEnabled = false;
+                        userSettings.databasePrompt = null;
+                    }
                 }
-                else {
-                    console.log(`[Worker] No database prompt found, will use hardcoded prompt`);
+                catch (error) {
+                    // Retry failed - rethrow to mark run as FAILED
+                    console.error(`[Worker] ❌ Failed to load prompt settings after retries:`, error);
+                    throw error;
                 }
             }
             // Add profileId to settings for database prompt usage
@@ -803,14 +818,208 @@ async function loadProjectSettingsFromRules(rules) {
     return settings;
 }
 /**
- * Placeholder for the 'GROW' automation flow.
+ * Load user-specific grow settings
+ */
+async function loadUserGrowSettings(profileId, userId) {
+    try {
+        // Try to get user-specific grow settings first
+        const userSettings = await apiService.getUserGrowSettings(profileId);
+        if (userSettings) {
+            console.log(`[Worker] Found user-specific grow settings for profile ${profileId}`);
+            // Get Gemini API key if userId is provided and AI is enabled
+            if (userId && userSettings.aiCommentEnabled && !userSettings.geminiApiKey) {
+                console.log(`[Worker] Fetching Gemini API key for AI comment generation...`);
+                const geminiApiKey = await getGeminiApiKey(userId);
+                if (geminiApiKey) {
+                    userSettings.geminiApiKey = geminiApiKey;
+                    console.log(`[Worker] Gemini API key added to settings`);
+                }
+                else {
+                    console.log(`[Worker] No Gemini API key found, AI comments will be disabled`);
+                    userSettings.aiCommentEnabled = false;
+                }
+            }
+            // Get prompt settings from database if AI is enabled
+            // Note: GROW uses COMMENT prompt settings since both use AI comment generation
+            if (userSettings.aiCommentEnabled) {
+                console.log(`[Worker] Fetching prompt settings from database (using COMMENT type)...`);
+                try {
+                    const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
+                    console.log(`[Worker] Prompt settings response:`, {
+                        hasPromptSettings: !!promptSettings,
+                        hasFinalPrompt: !!(promptSettings?.finalPrompt),
+                        hasRequirePrompt: !!(promptSettings?.requirePrompt),
+                        hasSelectedStyles: !!(promptSettings?.selectedPromptStyles?.length)
+                    });
+                    if (promptSettings && promptSettings.finalPrompt && promptSettings.requirePrompt) {
+                        userSettings.databasePrompt = {
+                            finalPrompt: promptSettings.finalPrompt,
+                            requirePrompt: promptSettings.requirePrompt
+                        };
+                        // Add selectedPromptStyles from prompt settings
+                        if (promptSettings.selectedPromptStyles) {
+                            userSettings.selectedPromptStyles = promptSettings.selectedPromptStyles;
+                            console.log(`[Worker] Selected prompt styles loaded: ${promptSettings.selectedPromptStyles.length} styles`);
+                        }
+                        console.log(`[Worker] ✅ Database prompt loaded successfully for GROW`);
+                    }
+                    else {
+                        console.error(`[Worker] ❌ No database prompt found or incomplete. AI comments will be disabled.`);
+                        console.error(`[Worker] Prompt settings:`, JSON.stringify(promptSettings, null, 2));
+                        console.error(`[Worker] Please ensure prompt_final table has a record with type='COMMENT' for this profile.`);
+                        userSettings.aiCommentEnabled = false;
+                        userSettings.databasePrompt = null;
+                    }
+                }
+                catch (error) {
+                    // Retry failed - rethrow to mark run as FAILED
+                    console.error(`[Worker] ❌ Failed to load prompt settings after retries:`, error);
+                    throw error;
+                }
+            }
+            else {
+                console.log(`[Worker] AI comment not enabled in grow settings, skipping prompt loading`);
+            }
+            return userSettings;
+        }
+        // Fallback to default grow settings (no user settings found - this is OK)
+        console.log(`[Worker] No user-specific grow settings found, using defaults`);
+        return {
+            steps: [],
+            links: [],
+            delay_between_links: { min: 8000, max: 20000 },
+            user_delay_follow: { min: 1500, max: 4000 },
+            profileId: profileId,
+            enableLike: true,
+            enableComment: true,
+            aiCommentEnabled: false,
+            geminiApiKey: ''
+        };
+    }
+    catch (error) {
+        // If error is from getUserPromptSettings (network error after retries), rethrow it
+        // Otherwise, log and rethrow to mark run as FAILED
+        console.error('[Worker] ❌ Error loading user grow settings:', error);
+        throw error; // Rethrow to mark run as FAILED
+    }
+}
+/**
+ * Executes the YAP Grow automation flow for a 'GROW' type run.
  */
 async function runGrowFlow(run) {
-    console.log(`[${run.id}] Starting GROW flow (simulation)...`);
-    // TODO: Implement the specific logic for the 'GROW' service
-    // e.g., finding users to follow, engaging with specific communities, etc.
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    console.log(`[${run.id}] GROW flow simulation finished.`);
+    console.log(`[${run.id}] Starting YAP Grow flow for profile: ${run.profile?.handle || 'unknown'}`);
+    try {
+        // For GROW runs, we need to get userId from run
+        const userId = run.userId || run.profile?.userId;
+        if (!userId) {
+            console.error(`[${run.id}] Security violation: No userId found for run`);
+            throw new Error('Security violation: No userId found for run');
+        }
+        console.log(`[${run.id}] Using userId from run: ${userId}`);
+        // Load user-specific grow settings with userId for Gemini API key
+        let settings;
+        try {
+            settings = await loadUserGrowSettings(run.profile.id, userId);
+        }
+        catch (error) {
+            console.error(`[${run.id}] ❌ Failed to load grow settings:`, error);
+            await apiService.updateRunStatus(run.id, 'FAILED', {
+                completedAt: new Date(),
+                error: `Failed to load grow settings: ${error instanceof Error ? error.message : String(error)}`
+            });
+            return;
+        }
+        // Process cache to filter out already processed links
+        const processedSettings = await processCacheForRun(run, settings);
+        console.log(`[${run.id}] Loaded grow settings:`, {
+            linksCount: processedSettings.links.length,
+            stepsCount: processedSettings.steps?.length || 0,
+            enableLike: processedSettings.enableLike,
+            enableComment: processedSettings.enableComment,
+            delayBetweenLinks: processedSettings.delay_between_links,
+            userDelayFollow: processedSettings.user_delay_follow,
+            aiCommentEnabled: processedSettings.aiCommentEnabled,
+            hasGeminiApiKey: !!processedSettings.geminiApiKey,
+            hasDatabasePrompt: !!(processedSettings.databasePrompt && processedSettings.databasePrompt.finalPrompt && processedSettings.databasePrompt.requirePrompt),
+            hasSelectedStyles: !!processedSettings.selectedPromptStyles?.length,
+            promptStyleMode: processedSettings.promptStyleMode
+        });
+        // Stop run if no links available to process - BEFORE initializing browser
+        if (processedSettings.links.length === 0) {
+            console.log(`[${run.id}] No links available to process, stopping run with success`);
+            await apiService.updateRunStatus(run.id, 'SUCCESS', {
+                completedAt: new Date(),
+                stats: {
+                    message: 'All links already processed',
+                    linksProcessed: 0,
+                    followed: 0,
+                    liked: 0,
+                    commented: 0
+                }
+            });
+            return;
+        }
+        // Validate that steps are configured
+        if (!processedSettings.steps || processedSettings.steps.length === 0) {
+            console.log(`[${run.id}] No steps configured in grow settings, stopping run`);
+            await apiService.updateRunStatus(run.id, 'FAILED', {
+                completedAt: new Date(),
+                error: 'No steps configured in grow settings'
+            });
+            return;
+        }
+        // Initialize YapGrow service
+        console.log(`[${run.id}] Initializing YapGrow service`);
+        const yapGrowService = new rawbot_1.YapGrow();
+        // Initialize XClient with profile and proxy
+        console.log(`[${run.id}] Initializing browser for profile: ${run.profile?.handle || 'unknown'}`);
+        const proxyConfig = parseProxyString(run.profile.proxy || '');
+        await yapGrowService.initializeWithProfile(run.profile, proxyConfig);
+        // Track the browser for cleanup
+        activeBrowsers.set(run.id, yapGrowService);
+        // Run the complete yapgrow workflow
+        const result = await yapGrowService.runYapGrowWorkflow(run.project || { id: 'default', name: 'Grow Run', createdAt: new Date(), updatedAt: new Date() }, run, processedSettings);
+        console.log(`[${run.id}] YAP Grow workflow completed:`, {
+            success: result.success,
+            processedLinks: result.processedLinks.length,
+            failedLinks: result.failedLinks.length,
+            followed: result.followedCount,
+            liked: result.likedCount,
+            commented: result.commentedCount,
+            profileExtracted: result.profileExtractedCount,
+            duration: result.duration
+        });
+        if (!result.success) {
+            throw new Error(`YAP Grow workflow failed: ${result.errors.join(', ')}`);
+        }
+    }
+    catch (error) {
+        // Check if it's a profile already in use error first
+        if (error instanceof Error && await handleProfileBusyError(run, error)) {
+            return; // Don't throw error, just skip this run
+        }
+        // Only log error if we didn't handle it
+        console.error(`[${run.id}] Error in YAP Grow flow:`, error);
+        throw error;
+    }
+    finally {
+        // Cleanup browser when run completes
+        if (activeBrowsers.has(run.id)) {
+            try {
+                const browser = activeBrowsers.get(run.id);
+                if (browser && typeof browser.close === 'function') {
+                    await browser.close();
+                    console.log(`[${run.id}] Browser closed after grow workflow completion`);
+                }
+            }
+            catch (error) {
+                console.error(`[${run.id}] Error closing browser:`, error);
+            }
+            finally {
+                activeBrowsers.delete(run.id);
+            }
+        }
+    }
 }
 /**
  * Executes the YAP Comment automation flow for a 'COMMENT' type run.
@@ -827,7 +1036,18 @@ async function runCommentFlow(run) {
         }
         console.log(`[${run.id}] Using userId from run: ${userId}`);
         // Load user-specific comment settings with userId for Gemini API key
-        const settings = await loadUserCommentSettings(run.profile.id, userId);
+        let settings;
+        try {
+            settings = await loadUserCommentSettings(run.profile.id, userId);
+        }
+        catch (error) {
+            console.error(`[${run.id}] ❌ Failed to load comment settings:`, error);
+            await apiService.updateRunStatus(run.id, 'FAILED', {
+                completedAt: new Date(),
+                error: `Failed to load comment settings: ${error instanceof Error ? error.message : String(error)}`
+            });
+            return;
+        }
         // Process cache to filter out already processed links
         const processedSettings = await processCacheForRun(run, settings);
         console.log(`[${run.id}] Loaded comment settings:`, {

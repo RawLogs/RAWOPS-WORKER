@@ -255,9 +255,7 @@ class ErrorDriver {
             'this account doesn\'t exist': 'Account does not exist',
             'this account has been suspended': 'Account suspended',
             'this post is from a suspended account': 'Post from suspended account',
-            'this tweet is unavailable': 'Tweet unavailable',
-            'something went wrong': 'Something went wrong',
-            'rate limit': 'Rate limited'
+            'this tweet is unavailable': 'Tweet unavailable'
         };
         const lowerMessage = message.toLowerCase();
         for (const [key, value] of Object.entries(errorMappings)) {

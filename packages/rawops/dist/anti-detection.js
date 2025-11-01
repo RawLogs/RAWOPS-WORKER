@@ -205,11 +205,21 @@ class AntiDetectionIntegration {
         const behavioralPattern = exports.BEHAVIORAL_PATTERNS[pattern] || this.currentPattern;
         try {
             let targetElement;
+            let selectorString = null;
             if (typeof element === 'string') {
+                selectorString = element;
                 targetElement = await this.driver.findElement(selenium_webdriver_1.By.css(element));
             }
             else {
                 targetElement = element;
+                // Try to get selector from element if possible (for retry)
+                try {
+                    const elementId = await targetElement.getId();
+                    // Store element reference for potential retry
+                }
+                catch (e) {
+                    // Cannot get selector, will retry with element
+                }
             }
             // Scroll element into view with mouse movement
             await this.scrollToElementWithMouse(targetElement);
@@ -233,8 +243,39 @@ class AntiDetectionIntegration {
                 includeMicroMovements: true,
                 includePauses: false
             });
-            // Perform click
-            await targetElement.click();
+            // Perform click with retry for stale element
+            try {
+                await targetElement.click();
+            }
+            catch (clickError) {
+                // If stale element error and we have selector, retry by finding element again
+                if (clickError.name === 'StaleElementReferenceError' ||
+                    clickError.message?.includes('stale element') ||
+                    clickError.message?.includes('StaleElementReference')) {
+                    console.log('[AntiDetection] Element stale, attempting to find and click again...');
+                    // If we have selector string, use it to find element again
+                    if (selectorString) {
+                        try {
+                            targetElement = await this.driver.findElement(selenium_webdriver_1.By.css(selectorString));
+                            // Verify element is still valid
+                            await targetElement.isDisplayed();
+                            // Try click again
+                            await targetElement.click();
+                        }
+                        catch (retryError) {
+                            console.error('[AntiDetection] Retry click failed:', retryError);
+                            throw retryError;
+                        }
+                    }
+                    else {
+                        // No selector available, throw original error
+                        throw clickError;
+                    }
+                }
+                else {
+                    throw clickError;
+                }
+            }
             // Post-click behavior
             await this.simulatePostClickBehavior(behavioralPattern);
             this.interactionCount++;

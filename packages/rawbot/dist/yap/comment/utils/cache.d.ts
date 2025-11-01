@@ -25,6 +25,7 @@ export declare function submitCacheToAPI(cacheDir: string, profileId: string, ru
 export declare function saveLinkStatusToAPI(profileId: string, link: string, status: 'done' | 'failed', details?: {
     liked?: boolean;
     commented?: boolean;
+    followed?: boolean;
     error?: string;
 }): Promise<void>;
 /**
@@ -33,6 +34,7 @@ export declare function saveLinkStatusToAPI(profileId: string, link: string, sta
 export declare function submitSingleLinkToInteractionLogs(profileId: string, link: string, status: 'done' | 'failed', details: {
     liked?: boolean;
     commented?: boolean;
+    followed?: boolean;
     error?: string;
     runId?: string;
 }): Promise<void>;
@@ -43,6 +45,7 @@ export declare function submitSingleLinkToInteractionLogs(profileId: string, lin
 export declare function saveCacheAndSubmitAPI(cacheDir: string, profileId: string, link: string, status: 'done' | 'failed', details: {
     liked?: boolean;
     commented?: boolean;
+    followed?: boolean;
     error?: string;
     runId?: string;
 }): Promise<{

@@ -37,6 +37,22 @@ export declare class BaseOps {
     protected typeCharacterByCharacter(selector: string, text: string): Promise<boolean>;
     protected typeCharacterByCharacterElement(element: WebElement, text: string): Promise<boolean>;
     protected typeCommentForXEditor(element: WebElement, comment: string): Promise<boolean>;
+    /**
+     * Find element by CSS selector with optional timeout
+     */
+    protected findElementByCss(selector: string, timeout?: number): Promise<WebElement>;
+    /**
+     * Find elements by CSS selector
+     */
+    protected findElementsByCss(selector: string): Promise<WebElement[]>;
+    /**
+     * Find element by XPath selector
+     */
+    protected findElementByXpath(xpath: string): Promise<WebElement>;
+    /**
+     * Find elements by XPath selector
+     */
+    protected findElementsByXpath(xpath: string): Promise<WebElement[]>;
     protected cleanExtractedContent(content: string, username?: string): string;
 }
 //# sourceMappingURL=base.d.ts.map

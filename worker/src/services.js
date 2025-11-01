@@ -211,6 +211,18 @@ class ApiService {
             return null;
         }
     }
+    async getUserGrowSettings(profileId) {
+        try {
+            const response = await axios_1.default.get(`${this.baseUrl}/user/grow-settings?profileId=${profileId}`, {
+                headers: this.getHeaders()
+            });
+            return response.data;
+        }
+        catch (error) {
+            console.error('Error getting user grow settings:', error);
+            return null;
+        }
+    }
     async getUserApiKey(userId) {
         try {
             const response = await axios_1.default.get(`${this.baseUrl}/user/api-key`, {
@@ -223,17 +235,36 @@ class ApiService {
             return null;
         }
     }
-    async getUserPromptSettings(profileId, type = 'COMMENT') {
-        try {
-            const response = await axios_1.default.get(`${this.baseUrl}/user/prompt-settings?profileId=${profileId}&type=${type}`, {
-                headers: this.getHeaders()
-            });
-            return response.data;
+    async getUserPromptSettings(profileId, type = 'COMMENT', retries = 3) {
+        let lastError = null;
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const response = await axios_1.default.get(`${this.baseUrl}/user/prompt-settings?profileId=${profileId}&type=${type}`, {
+                    headers: this.getHeaders(),
+                    timeout: 15000
+                });
+                return response.data;
+            }
+            catch (error) {
+                lastError = error;
+                const isNetworkError = error.code === 'ECONNRESET' ||
+                    error.code === 'ECONNREFUSED' ||
+                    error.code === 'ENOTFOUND' ||
+                    error.code === 'ETIMEDOUT' ||
+                    error.message?.includes('socket hang up');
+                if (isNetworkError && attempt < retries) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
+                    console.log(`[Worker] Retry ${attempt}/${retries} for getUserPromptSettings after ${delay}ms (${error.code || error.message})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+                // If not network error or last attempt, break and throw
+                break;
+            }
         }
-        catch (error) {
-            console.error('Error getting user prompt settings:', error);
-            return null;
-        }
+        // All retries failed - throw error
+        console.error(`[Worker] ❌ Failed to get user prompt settings after ${retries} attempts:`, lastError?.message || lastError);
+        throw new Error(`Failed to load prompt settings: ${lastError?.message || 'Unknown error'}`);
     }
     async getRunStatus(runId) {
         try {

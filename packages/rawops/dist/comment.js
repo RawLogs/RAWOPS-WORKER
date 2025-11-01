@@ -664,6 +664,104 @@ class CommentOps extends base_1.BaseOps {
         }
         return { success: false, error: 'All submit attempts failed' };
     }
+    /**
+     * Process interaction with a specific tweet (like and comment)
+     * Similar to processTweetInteractionWithArticle in cbp.ts
+     */
+    async processTweetInteraction(tweetData, options = {}) {
+        const { enableLike = true, enableComment = true, commentText, useAntiDetection = true, behavioralPattern = 'browsing', mouseIntensity = 'medium' } = options;
+        let liked = false;
+        let commented = false;
+        try {
+            // Step 1: Like the tweet
+            if (enableLike) {
+                try {
+                    const likeButton = await this.driver.executeScript(`
+            const tweet = arguments[0];
+            const likeButton = tweet.querySelector('[data-testid="like"]');
+            return likeButton;
+          `, tweetData.element);
+                    if (likeButton) {
+                        await this.driver.executeScript('arguments[0].click();', likeButton);
+                        await this.randomDelay(1000, 2000);
+                        liked = true;
+                    }
+                }
+                catch (error) {
+                    // Failed to like, continue
+                }
+                // Wait after like
+                await this.randomDelay(2000, 3000);
+            }
+            // Step 2: Comment on the tweet
+            if (enableComment) {
+                try {
+                    const replyButton = await this.driver.executeScript(`
+            const tweet = arguments[0];
+            const replyButton = tweet.querySelector('[data-testid="reply"]');
+            return replyButton;
+          `, tweetData.element);
+                    if (replyButton) {
+                        await this.driver.executeScript('arguments[0].click();', replyButton);
+                        await this.randomDelay(2000, 3000);
+                        // Use comment text if provided, otherwise use default
+                        const finalCommentText = commentText || '👍';
+                        const commentResult = await this.commentOnFirstTweet(finalCommentText, {
+                            useAntiDetection,
+                            behavioralPattern,
+                            mouseIntensity
+                        });
+                        commented = commentResult.success;
+                        // Close comment modal if opened
+                        // Try to close modal without navigating away (use ESC key first, then back button)
+                        try {
+                            // First try ESC key - less likely to navigate away
+                            await this.driver.actions().sendKeys('\uE00C').perform();
+                            await this.randomDelay(1500, 2000);
+                            // Check if modal is still open by looking for input field
+                            try {
+                                const inputCheck = await this.driver.findElements(selenium_webdriver_1.By.css('[data-testid="tweetTextarea_0"]'));
+                                if (inputCheck.length > 0) {
+                                    // Modal still open, try back button
+                                    console.log('[CommentOps] ESC key did not close modal, trying back button');
+                                    const backButton = await this.driver.findElement(selenium_webdriver_1.By.css('[data-testid="app-bar-back"]'));
+                                    await backButton.click();
+                                    await this.randomDelay(1500, 2000);
+                                }
+                                else {
+                                    console.log('[CommentOps] Modal closed successfully with ESC key');
+                                }
+                            }
+                            catch (checkError) {
+                                // If we can't find input, assume modal is closed
+                                console.log('[CommentOps] Could not verify modal state, assuming closed');
+                            }
+                        }
+                        catch (e) {
+                            // ESC failed, try back button
+                            try {
+                                console.log('[CommentOps] ESC key failed, trying back button');
+                                const backButton = await this.driver.findElement(selenium_webdriver_1.By.css('[data-testid="app-bar-back"]'));
+                                await backButton.click();
+                                await this.randomDelay(1500, 2000);
+                            }
+                            catch (e2) {
+                                console.log('[CommentOps] Failed to close modal with both ESC and back button');
+                                // Ignore - modal may have closed automatically or we're on wrong page
+                            }
+                        }
+                    }
+                }
+                catch (error) {
+                    // Failed to comment, continue
+                }
+            }
+            return { liked, commented };
+        }
+        catch (error) {
+            return { liked, commented };
+        }
+    }
 }
 exports.CommentOps = CommentOps;
 //# sourceMappingURL=comment.js.map

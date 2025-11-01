@@ -48,6 +48,30 @@ export declare class ScrollOps extends BaseOps {
      * Infinite scroll until no more content
      */
     infiniteScroll(options?: ScrollOptions): Promise<InteractionResult>;
+    /**
+     * Scroll and detect tweets by status ID
+     * Returns tweet data when found, or null if not found after max scroll steps
+     */
+    scrollAndDetectTweets(targetStatusId: string | null, options?: {
+        maxScrollSteps?: number;
+        scrollHeight?: number;
+        scrollDelay?: number;
+        detectLimit?: number;
+    }): Promise<{
+        tweet: {
+            element: any;
+            link: string;
+            statusId: string | null;
+            cellInnerDiv: any;
+        } | null;
+        scrollSteps: number;
+        detectedTweets: Array<{
+            element: any;
+            link: string;
+            statusId: string | null;
+            cellInnerDiv: any;
+        }>;
+    }>;
 }
 export declare function smoothRandomScroll(driver: WebDriver, duration?: number): Promise<void>;
 //# sourceMappingURL=scroll.d.ts.map

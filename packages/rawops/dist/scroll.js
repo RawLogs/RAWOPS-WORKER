@@ -331,6 +331,95 @@ class ScrollOps extends base_1.BaseOps {
             return { success: false, error: `Error in infinite scroll: ${error}` };
         }
     }
+    /**
+     * Scroll and detect tweets by status ID
+     * Returns tweet data when found, or null if not found after max scroll steps
+     */
+    async scrollAndDetectTweets(targetStatusId, options = {}) {
+        try {
+            const { maxScrollSteps = 10, scrollHeight = 800 + Math.random() * 200, scrollDelay = 3000, detectLimit = 10 } = options;
+            const detectedTweets = [];
+            for (let step = 0; step < maxScrollSteps; step++) {
+                // Get all visible tweets
+                const tweets = await this.driver.executeScript(`
+          const tweets = document.querySelectorAll('[data-testid="tweet"]');
+          const tweetData = [];
+          
+          tweets.forEach(tweet => {
+            // Find the cellInnerDiv article
+            const cellInnerDiv = tweet.closest('[data-testid="cellInnerDiv"]');
+            if (!cellInnerDiv) return;
+            
+            // Extract tweet link
+            const linkElement = tweet.querySelector('a[href*="/status/"]');
+            if (!linkElement) return;
+            
+            const href = linkElement.getAttribute('href');
+            if (!href) return;
+            
+            // Extract status ID
+            const statusMatch = href.match(/\\/status\\/(\\d+)/);
+            const statusId = statusMatch ? statusMatch[1] : null;
+            
+            tweetData.push({
+              element: tweet,
+              link: href,
+              statusId: statusId,
+              cellInnerDiv: cellInnerDiv
+            });
+          });
+          
+          return tweetData;
+        `);
+                // Add to detected tweets (limit to detectLimit)
+                for (const tweet of tweets) {
+                    if (detectedTweets.length >= detectLimit)
+                        break;
+                    // Check if already detected
+                    const alreadyDetected = detectedTweets.some(dt => dt.statusId === tweet.statusId);
+                    if (!alreadyDetected) {
+                        detectedTweets.push(tweet);
+                    }
+                }
+                // Check each tweet for matching status ID
+                if (targetStatusId) {
+                    for (const tweet of tweets) {
+                        if (tweet.statusId === targetStatusId) {
+                            // Scroll to this specific tweet
+                            await this.driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', tweet.cellInnerDiv);
+                            await this.randomDelay(2000, 3000);
+                            return {
+                                tweet,
+                                scrollSteps: step + 1,
+                                detectedTweets
+                            };
+                        }
+                    }
+                }
+                // Scroll down for next step
+                if (step < maxScrollSteps - 1) {
+                    // Add random variation to scroll height (-10% to +30%)
+                    const variation = (Math.random() - 0.1) * 0.4;
+                    const actualScrollHeight = Math.round(scrollHeight * (1 + variation));
+                    await this.driver.executeScript(`window.scrollBy(0, ${actualScrollHeight});`);
+                    await this.driver.sleep(scrollDelay);
+                }
+            }
+            return {
+                tweet: null,
+                scrollSteps: maxScrollSteps,
+                detectedTweets
+            };
+        }
+        catch (error) {
+            return {
+                tweet: null,
+                scrollSteps: 0,
+                detectedTweets: [],
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
+    }
 }
 exports.ScrollOps = ScrollOps;
 // Standalone smooth random scroll function (moved from selenium-utils.ts)

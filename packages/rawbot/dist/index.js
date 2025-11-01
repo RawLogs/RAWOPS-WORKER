@@ -18,7 +18,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setupBrowser = exports.RawOps = exports.bulkUpdateLinksStatusAPI = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
+exports.calculateFollowRatio = exports.Drivers = exports.setupBrowser = exports.RawOps = exports.bulkUpdateLinksStatusAPI = exports.YapGrow = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
 // Core services exports
 var XClient_1 = require("./client/XClient");
 Object.defineProperty(exports, "XClient", { enumerable: true, get: function () { return XClient_1.XClient; } });
@@ -42,7 +42,8 @@ var cbl_1 = require("./yap/comment/cbl");
 Object.defineProperty(exports, "CommentByLink", { enumerable: true, get: function () { return cbl_1.CommentByLink; } });
 var YapInitManager_1 = require("./yap/YapInitManager");
 Object.defineProperty(exports, "YapInitManager", { enumerable: true, get: function () { return YapInitManager_1.YapInitManager; } });
-__exportStar(require("./yap/grow/yapGrowService"), exports);
+var yg_1 = require("./yap/grow/yg");
+Object.defineProperty(exports, "YapGrow", { enumerable: true, get: function () { return yg_1.YapGrow; } });
 // Cache utilities exports
 var cache_1 = require("./yap/comment/utils/cache");
 Object.defineProperty(exports, "bulkUpdateLinksStatusAPI", { enumerable: true, get: function () { return cache_1.bulkUpdateLinksStatusAPI; } });
@@ -50,4 +51,8 @@ Object.defineProperty(exports, "bulkUpdateLinksStatusAPI", { enumerable: true, g
 var rawops_1 = require("@rawops/rawops");
 Object.defineProperty(exports, "RawOps", { enumerable: true, get: function () { return rawops_1.RawOps; } });
 Object.defineProperty(exports, "setupBrowser", { enumerable: true, get: function () { return rawops_1.setupBrowser; } });
+// Driver exports
+var drivers_1 = require("./driver/drivers");
+Object.defineProperty(exports, "Drivers", { enumerable: true, get: function () { return drivers_1.Drivers; } });
+Object.defineProperty(exports, "calculateFollowRatio", { enumerable: true, get: function () { return drivers_1.calculateFollowRatio; } });
 //# sourceMappingURL=index.js.map

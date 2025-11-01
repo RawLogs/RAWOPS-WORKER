@@ -310,7 +310,8 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
                         details: {
                             timestamp: new Date().toISOString(),
                             commentPosted: item.commented || false,
-                            likePosted: item.liked || false
+                            likePosted: item.liked || false,
+                            followedPosted: item.followed || false
                         }
                     })),
                     ...newFailedLinks.map((item) => {
@@ -512,6 +513,7 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
                         timestamp: new Date().toISOString(),
                         commentPosted: details.commented || false,
                         likePosted: details.liked || false,
+                        followedPosted: details.followed || false,
                         ...(status === 'failed' && {
                             reason: details.error || 'Unknown error',
                             error: details.error || 'Unknown error'

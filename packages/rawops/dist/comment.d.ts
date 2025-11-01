@@ -4,6 +4,24 @@ export interface CommentOptions extends ClickOptions {
     content: string;
     replyToTweetId?: string;
 }
+export interface TweetInteractionOptions {
+    enableLike?: boolean;
+    enableComment?: boolean;
+    commentText?: string;
+    useAntiDetection?: boolean;
+    behavioralPattern?: 'reading' | 'browsing' | 'scanning' | 'casual' | 'focused';
+    mouseIntensity?: 'low' | 'medium' | 'high';
+}
+export interface TweetInteractionResult {
+    liked?: boolean;
+    commented?: boolean;
+}
+export interface TweetInteractionData {
+    element: any;
+    link: string;
+    statusId: string | null;
+    cellInnerDiv: any;
+}
 export declare class CommentOps extends BaseOps {
     constructor(driver: WebDriver);
     /**
@@ -31,5 +49,10 @@ export declare class CommentOps extends BaseOps {
      * This is the core method for submitting comments with comprehensive fallback strategies
      */
     private submitComment;
+    /**
+     * Process interaction with a specific tweet (like and comment)
+     * Similar to processTweetInteractionWithArticle in cbp.ts
+     */
+    processTweetInteraction(tweetData: TweetInteractionData, options?: TweetInteractionOptions): Promise<TweetInteractionResult>;
 }
 //# sourceMappingURL=comment.d.ts.map
