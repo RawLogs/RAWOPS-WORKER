@@ -41,6 +41,7 @@ const services_1 = __importDefault(require("./services"));
 const rawbot_1 = require("@rawops/rawbot");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const crypto = __importStar(require("crypto"));
 const POLL_INTERVAL = 5000; // 5 seconds
 // Initialize API service
 const apiService = new services_1.default();
@@ -233,6 +234,99 @@ function parseProxyString(proxyString) {
         return null;
     }
 }
+/**
+ * Calculate checksum of all dist folders in the packages directory
+ * This creates a hash based on dist folder contents to detect code changes
+ * Only checks dist/ folders because we only copy dist when building
+ */
+function calculatePackagesChecksum() {
+    // TARGET: I:\AI\RAWOPS\RAWOPS-AI\packages
+    // Worker in RAWOPS-AI must calculate checksum ONLY from RAWOPS-AI\packages (no fallback)
+    // From: I:\AI\RAWOPS\RAWOPS-AI\apps\worker\src\index.ts
+    // To:   I:\AI\RAWOPS\RAWOPS-AI\packages
+    let rootDir = process.cwd();
+    let packagesDir = null;
+    // Strategy: Find RAWOPS-AI root directory that contains packages/
+    // If we're in apps/worker/dist or apps/worker/src, go up to find RAWOPS-AI root
+    let currentDir = rootDir;
+    while (currentDir !== path.dirname(currentDir)) {
+        const testPackagesDir = path.join(currentDir, 'packages');
+        // Check if this directory contains packages/ AND is RAWOPS-AI
+        if (fs.existsSync(testPackagesDir) && currentDir.includes('RAWOPS-AI')) {
+            packagesDir = testPackagesDir;
+            rootDir = currentDir;
+            break;
+        }
+        // Stop if we've gone up too far (reached drive root or unrelated directory)
+        if (currentDir === path.dirname(currentDir)) {
+            break;
+        }
+        currentDir = path.dirname(currentDir);
+    }
+    if (!packagesDir || !fs.existsSync(packagesDir)) {
+        console.warn(`[Checksum] RAWOPS-AI packages directory not found: ${packagesDir || 'not found'}`);
+        console.warn(`[Checksum] Current working directory: ${rootDir}`);
+        return crypto.createHash('sha256').update('no-packages').digest('hex');
+    }
+    console.log(`[Checksum] Calculating checksum from: ${packagesDir}`);
+    const hash = crypto.createHash('sha256');
+    // Process each package's dist folder
+    function processDistDirectory(distPath, packageName, basePackagesDir) {
+        if (!fs.existsSync(distPath)) {
+            console.warn(`[Checksum] Dist directory does not exist for ${packageName}: ${distPath}`);
+            return;
+        }
+        const entries = fs.readdirSync(distPath, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(distPath, entry.name);
+            // Calculate relative path from packagesDir, not distPath, for consistency
+            const relativePath = path.relative(basePackagesDir, fullPath);
+            const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
+            // Skip node_modules and other non-code directories
+            if (entry.name === 'node_modules' ||
+                entry.name === '.git' ||
+                entry.name.startsWith('.')) {
+                continue;
+            }
+            if (entry.isDirectory()) {
+                processDistDirectory(fullPath, packageName, basePackagesDir);
+            }
+            else if (entry.isFile()) {
+                try {
+                    // Include package name, normalized relative path, and content in hash
+                    const content = fs.readFileSync(fullPath);
+                    hash.update(packageName);
+                    hash.update(normalizedPath);
+                    hash.update(content);
+                }
+                catch (error) {
+                    console.warn(`[Checksum] Error reading file ${fullPath}:`, error);
+                }
+            }
+        }
+    }
+    // Find all packages and process their dist folders
+    try {
+        const packages = fs.readdirSync(packagesDir, { withFileTypes: true });
+        for (const pkg of packages) {
+            if (pkg.isDirectory()) {
+                const distPath = path.join(packagesDir, pkg.name, 'dist');
+                if (fs.existsSync(distPath)) {
+                    processDistDirectory(distPath, pkg.name, packagesDir);
+                }
+                else {
+                    // If no dist folder, still include package name to detect missing builds
+                    hash.update(pkg.name);
+                    hash.update('no-dist');
+                }
+            }
+        }
+    }
+    catch (error) {
+        console.error(`[Checksum] Error processing packages directory:`, error);
+    }
+    return hash.digest('hex');
+}
 // --- Main Worker Loop ---
 async function main() {
     console.log('🚀 Worker started. Polling for jobs...');
@@ -240,6 +334,50 @@ async function main() {
         // Check for queued runs
         const run = await findAndLockQueuedRun();
         if (run) {
+            // Validate worker version if workerVersionId is provided
+            if (run.workerVersionId && run.workerVersion) {
+                const requiredVersion = run.workerVersion.version;
+                const requiredChecksum = run.workerVersion.checksum;
+                const versionDisplay = `${requiredVersion}${requiredChecksum}`;
+                console.log(`\n[${run.id}] ═══════════════════════════════════════════════════════════════════`);
+                console.log(`[${run.id}] 🔍 WORKER VERSION VALIDATION`);
+                console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════`);
+                console.log(`[${run.id}] 📦 Required Version: ${requiredVersion}`);
+                console.log(`[${run.id}] 🔐 Expected Checksum: ${requiredChecksum}`);
+                const currentChecksum = calculatePackagesChecksum();
+                console.log(`[${run.id}] 🔧 Check worker version: ${currentChecksum}`);
+                if (requiredChecksum !== currentChecksum) {
+                    console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════`);
+                    console.error(`\n[${run.id}] ❌ VERSION MISMATCH DETECTED`);
+                    console.error(`[${run.id}] ┌─ Expected:`);
+                    console.error(`[${run.id}] │  Version:     ${requiredVersion}`);
+                    console.error(`[${run.id}] │  Checksum:    ${requiredChecksum}`);
+                    console.error(`[${run.id}] │  Full String: ${versionDisplay}`);
+                    console.error(`[${run.id}] └─ Actual:`);
+                    console.error(`[${run.id}]    Checksum:    ${currentChecksum}`);
+                    console.error(`[${run.id}] ⚠️ Code in packages/ directory has changed. Skipping this run.`);
+                    console.error(`[${run.id}] 💡 Ensure worker code matches the required version before processing.`);
+                    console.error(`[${run.id}] ═══════════════════════════════════════════════════════════════════\n`);
+                    await apiService.updateRunStatus(run.id, 'FAILED', {
+                        error: `Version mismatch: Expected ${versionDisplay}, but code checksum is ${currentChecksum}. Please ensure worker code matches required version.`,
+                        versionMismatch: true,
+                        expectedVersion: versionDisplay,
+                        expectedVersionTag: requiredVersion,
+                        expectedChecksum: requiredChecksum,
+                        expectedVersionId: run.workerVersionId,
+                        actualChecksum: currentChecksum,
+                        completedAt: new Date()
+                    });
+                    return;
+                }
+                else {
+                    console.log(`[${run.id}] ✅ Validation successful! Proceeding to process the job.`);
+                    console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════\n`);
+                }
+            }
+            else {
+                console.log(`[${run.id}] ⚠️ No worker version requirement specified - proceeding without validation`);
+            }
             const profileHandle = run.profile?.handle;
             if (!profileHandle || profileHandle === 'unknown') {
                 console.log(`[${run.id}] ⚠️ Run skipped: Profile handle is unknown.`);
