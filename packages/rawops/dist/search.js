@@ -208,4 +208,3 @@ class SearchOps extends base_1.BaseOps {
     }
 }
 exports.SearchOps = SearchOps;
-//# sourceMappingURL=search.js.map

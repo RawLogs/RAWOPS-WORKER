@@ -37,4 +37,3 @@ export declare class Drivers {
 }
 export type { CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult };
 export { calculateFollowRatio };
-//# sourceMappingURL=drivers.d.ts.map

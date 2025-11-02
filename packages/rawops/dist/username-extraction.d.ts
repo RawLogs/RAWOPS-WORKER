@@ -38,4 +38,3 @@ export declare class UsernameExtractionOps extends BaseOps {
      */
     getUniqueUsernames(links: string[]): string[];
 }
-//# sourceMappingURL=username-extraction.d.ts.map

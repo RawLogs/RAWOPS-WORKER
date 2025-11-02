@@ -74,4 +74,3 @@ export declare class ScrollOps extends BaseOps {
     }>;
 }
 export declare function smoothRandomScroll(driver: WebDriver, duration?: number): Promise<void>;
-//# sourceMappingURL=scroll.d.ts.map

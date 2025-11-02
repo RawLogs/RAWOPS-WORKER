@@ -122,4 +122,3 @@ export declare class ExtractionOps extends BaseOps {
      */
     getCurrentTweetUrl(): Promise<string | null>;
 }
-//# sourceMappingURL=extraction.d.ts.map

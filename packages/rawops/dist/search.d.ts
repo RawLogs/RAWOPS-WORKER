@@ -58,4 +58,3 @@ export declare class SearchOps extends BaseOps {
      */
     searchMentions(username: string): Promise<InteractionResult>;
 }
-//# sourceMappingURL=search.d.ts.map

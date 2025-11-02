@@ -21,4 +21,3 @@ export declare class LikeOps extends BaseOps {
      */
     unlikeFirstTweet(options?: LikeOptions): Promise<InteractionResult>;
 }
-//# sourceMappingURL=like.d.ts.map

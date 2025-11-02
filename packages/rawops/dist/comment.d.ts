@@ -55,4 +55,3 @@ export declare class CommentOps extends BaseOps {
      */
     processTweetInteraction(tweetData: TweetInteractionData, options?: TweetInteractionOptions): Promise<TweetInteractionResult>;
 }
-//# sourceMappingURL=comment.d.ts.map

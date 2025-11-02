@@ -290,4 +290,3 @@ class BaseOps {
     }
 }
 exports.BaseOps = BaseOps;
-//# sourceMappingURL=base.js.map

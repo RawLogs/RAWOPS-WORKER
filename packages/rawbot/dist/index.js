@@ -55,4 +55,3 @@ Object.defineProperty(exports, "setupBrowser", { enumerable: true, get: function
 var drivers_1 = require("./driver/drivers");
 Object.defineProperty(exports, "Drivers", { enumerable: true, get: function () { return drivers_1.Drivers; } });
 Object.defineProperty(exports, "calculateFollowRatio", { enumerable: true, get: function () { return drivers_1.calculateFollowRatio; } });
-//# sourceMappingURL=index.js.map

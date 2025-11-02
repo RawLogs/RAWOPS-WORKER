@@ -58,4 +58,3 @@ export declare class WaitOps extends BaseOps {
      */
     waitForFormReady(formSelector?: string, timeout?: number): Promise<InteractionResult>;
 }
-//# sourceMappingURL=wait.d.ts.map

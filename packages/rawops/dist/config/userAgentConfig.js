@@ -406,4 +406,3 @@ function generateWebGLInfo(profile, config) {
     console.log(`[${profile}] Generated new WebGL info: ${webglInfo.vendor}`);
     return webglInfo;
 }
-//# sourceMappingURL=userAgentConfig.js.map

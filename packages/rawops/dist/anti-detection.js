@@ -511,4 +511,3 @@ async function simulateBrowsingSession(driver, actions, pattern = 'browsing') {
         });
     }
 }
-//# sourceMappingURL=anti-detection.js.map

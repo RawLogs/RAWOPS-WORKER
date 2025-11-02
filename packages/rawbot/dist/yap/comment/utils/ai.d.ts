@@ -24,4 +24,3 @@ export declare function generateReplyToComment(originalComment: string, commente
  * Now uses generateCommentWithUserStyles with comment content
  */
 export declare function generateReplyToTweetComment(commentContent: string, commentUsername: string, originalTweetContent: string, settings: YapCommentSettings): Promise<string | null>;
-//# sourceMappingURL=ai.d.ts.map

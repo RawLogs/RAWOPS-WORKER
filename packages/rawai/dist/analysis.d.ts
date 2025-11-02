@@ -32,4 +32,3 @@ export declare class AnalysisAI extends BaseAI {
      */
     analyzeTrendingTopics(topics: string[], context?: string): Promise<AIResult>;
 }
-//# sourceMappingURL=analysis.d.ts.map

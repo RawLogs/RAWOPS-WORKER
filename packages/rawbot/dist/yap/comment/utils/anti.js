@@ -185,4 +185,3 @@ async function performRandomMouseMovements(driver, commentOps) {
         await commentOps.randomDelay(1000, 2000);
     }
 }
-//# sourceMappingURL=anti.js.map

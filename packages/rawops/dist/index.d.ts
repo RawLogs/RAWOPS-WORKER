@@ -97,4 +97,3 @@ export declare class RawOps {
      */
     close(): Promise<void>;
 }
-//# sourceMappingURL=index.d.ts.map

@@ -120,4 +120,3 @@ export declare class YapGrow {
     private handleFollowUser;
     close(): Promise<void>;
 }
-//# sourceMappingURL=yg.d.ts.map

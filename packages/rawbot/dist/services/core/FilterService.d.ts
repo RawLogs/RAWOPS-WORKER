@@ -18,4 +18,3 @@ export declare class FilterService implements IFilterService {
      */
     private isSpamTweet;
 }
-//# sourceMappingURL=FilterService.d.ts.map

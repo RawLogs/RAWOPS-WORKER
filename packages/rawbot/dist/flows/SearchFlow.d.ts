@@ -25,4 +25,3 @@ export declare class SearchFlow extends BaseFlow {
     private applyFilters;
     private extractTweetsFromViewport;
 }
-//# sourceMappingURL=SearchFlow.d.ts.map

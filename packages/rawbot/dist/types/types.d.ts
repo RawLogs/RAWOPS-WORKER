@@ -56,4 +56,3 @@ export interface IAutomationFlow {
     getStatus(): 'idle' | 'running' | 'completed' | 'error';
     getResults(): FlowResult | null;
 }
-//# sourceMappingURL=types.d.ts.map

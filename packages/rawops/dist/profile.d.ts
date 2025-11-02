@@ -58,4 +58,3 @@ export declare class ProfileOps extends BaseOps {
  * Similar to calculateFollowRatio from legacy_nodejs.js
  */
 export declare function calculateFollowRatio(followersCount: number, followingCount: number): FollowRatioResult;
-//# sourceMappingURL=profile.d.ts.map

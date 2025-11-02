@@ -267,4 +267,3 @@ class PostOps extends base_1.BaseOps {
     }
 }
 exports.PostOps = PostOps;
-//# sourceMappingURL=post.js.map

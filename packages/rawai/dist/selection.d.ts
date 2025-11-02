@@ -37,4 +37,3 @@ export declare class SelectionAI extends BaseAI {
      */
     rankTweets(tweets: string[], criteria?: string[]): Promise<AIResult>;
 }
-//# sourceMappingURL=selection.d.ts.map

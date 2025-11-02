@@ -41,4 +41,3 @@ export declare class XClient {
      */
     initializeForAutomation(profileHandle: string, proxyConfig?: any): Promise<void>;
 }
-//# sourceMappingURL=XClient.d.ts.map

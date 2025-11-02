@@ -24,4 +24,3 @@ export declare class PostOps extends BaseOps {
      */
     private submitTweet;
 }
-//# sourceMappingURL=post.d.ts.map

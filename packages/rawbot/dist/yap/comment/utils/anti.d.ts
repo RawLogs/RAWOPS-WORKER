@@ -16,4 +16,3 @@ export declare function performIdleScroll(driver: WebDriver, scrollOps: ScrollOp
  * Perform random mouse movements for anti-detection using rawops anti-detection
  */
 export declare function performRandomMouseMovements(driver: WebDriver, commentOps: any): Promise<void>;
-//# sourceMappingURL=anti.d.ts.map

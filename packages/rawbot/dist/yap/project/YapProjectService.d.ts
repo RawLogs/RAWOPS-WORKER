@@ -67,4 +67,3 @@ export declare class YapProjectService {
      */
     saveYapProjectSettings(projectId: string, settings: YapProjectSettings): Promise<void>;
 }
-//# sourceMappingURL=YapProjectService.d.ts.map

@@ -47,4 +47,3 @@ export declare class EvaluationAI extends BaseAI {
      */
     compareContent(contentOptions: string[], criteria?: string[], options?: EvaluationOptions): Promise<AIResult>;
 }
-//# sourceMappingURL=evaluation.d.ts.map

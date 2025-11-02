@@ -15,4 +15,3 @@ export interface WaitOptions {
     waitForNetworkIdle?: boolean;
     waitForElement?: string;
 }
-//# sourceMappingURL=types.d.ts.map

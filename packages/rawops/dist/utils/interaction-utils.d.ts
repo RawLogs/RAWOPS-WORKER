@@ -22,4 +22,3 @@ export declare function generateMousePattern(progress: number, patternType: 'rea
     offsetX: number;
     offsetY: number;
 };
-//# sourceMappingURL=interaction-utils.d.ts.map

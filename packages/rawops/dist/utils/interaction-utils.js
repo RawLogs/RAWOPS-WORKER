@@ -127,4 +127,3 @@ function generateMousePattern(progress, patternType) {
     }
     return { offsetX, offsetY };
 }
-//# sourceMappingURL=interaction-utils.js.map

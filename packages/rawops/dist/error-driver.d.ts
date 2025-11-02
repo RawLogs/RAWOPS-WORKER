@@ -68,4 +68,3 @@ export declare function extractErrorDetails(driver: WebDriver, options?: ErrorDr
  * Utility function to check if page has errors
  */
 export declare function hasPageError(driver: WebDriver, options?: ErrorDriverOptions): Promise<boolean>;
-//# sourceMappingURL=error-driver.d.ts.map

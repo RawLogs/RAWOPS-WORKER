@@ -55,4 +55,3 @@ export declare class BaseOps {
     protected findElementsByXpath(xpath: string): Promise<WebElement[]>;
     protected cleanExtractedContent(content: string, username?: string): string;
 }
-//# sourceMappingURL=base.d.ts.map

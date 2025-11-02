@@ -40,4 +40,3 @@ export declare function waitForConditions(driver: WebDriver, options: WaitOption
  * Smart wait that adapts based on page state
  */
 export declare function smartWait(driver: WebDriver, timeout?: number): Promise<void>;
-//# sourceMappingURL=wait-utils.d.ts.map

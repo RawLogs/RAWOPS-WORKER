@@ -135,4 +135,3 @@ class DatabaseService {
 // Create a singleton instance
 const db = new DatabaseService();
 exports.default = db;
-//# sourceMappingURL=DatabaseService.js.map

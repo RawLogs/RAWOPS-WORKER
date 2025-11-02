@@ -19,4 +19,3 @@ export declare function getPageInfo(extractionOps: ExtractionOps): Promise<{
     tweetCount: number;
     mainTweetUrl: string | null;
 }>;
-//# sourceMappingURL=page.d.ts.map

@@ -33,4 +33,3 @@ export declare class EngagementOps extends BaseOps {
      */
     getTweetEngagement(): Promise<InteractionResult>;
 }
-//# sourceMappingURL=engagement.d.ts.map

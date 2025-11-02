@@ -197,4 +197,3 @@ class LikeOps extends base_1.BaseOps {
     }
 }
 exports.LikeOps = LikeOps;
-//# sourceMappingURL=like.js.map

@@ -12,4 +12,3 @@ declare class DatabaseService {
 }
 declare const db: DatabaseService;
 export default db;
-//# sourceMappingURL=DatabaseService.d.ts.map

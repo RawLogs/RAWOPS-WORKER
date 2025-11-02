@@ -487,4 +487,3 @@ function calculateFollowRatio(followersCount, followingCount) {
         followingCount
     };
 }
-//# sourceMappingURL=profile.js.map

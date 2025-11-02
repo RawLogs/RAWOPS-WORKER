@@ -18,4 +18,3 @@ export declare class SearchService implements ISearchService {
      */
     private transformRawTweetToDomain;
 }
-//# sourceMappingURL=SearchService.d.ts.map

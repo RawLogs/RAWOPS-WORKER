@@ -286,4 +286,3 @@ async function hasPageError(driver, options) {
     const errorDriver = new ErrorDriver(driver, options);
     return await errorDriver.hasError();
 }
-//# sourceMappingURL=error-driver.js.map

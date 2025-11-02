@@ -73,4 +73,3 @@ export declare function enhanceErrorDetails(driver: WebDriver, failedLinks: any[
  * Filter out already processed links from cache
  */
 export declare function filterProcessedLinks(cacheDir: string, links: string[]): Promise<string[]>;
-//# sourceMappingURL=cache.d.ts.map

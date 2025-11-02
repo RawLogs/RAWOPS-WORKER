@@ -18,4 +18,3 @@ export declare function formatProxyUrl(proxyConfig: ProxyConfig): string;
  * Create proxy configuration from environment variables
  */
 export declare function createProxyFromEnv(): ProxyConfig | null;
-//# sourceMappingURL=proxy-utils.d.ts.map

@@ -16,4 +16,3 @@ export { RawOps, setupBrowser } from '@rawops/rawops';
 export type { ProxyConfig } from '@rawops/rawops';
 export { Drivers, calculateFollowRatio } from './driver/drivers';
 export type { CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult } from './driver/drivers';
-//# sourceMappingURL=index.d.ts.map

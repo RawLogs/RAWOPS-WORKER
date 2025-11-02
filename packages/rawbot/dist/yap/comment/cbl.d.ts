@@ -85,4 +85,3 @@ export declare class CommentByLink {
     private processCommentLink;
     close(): Promise<void>;
 }
-//# sourceMappingURL=cbl.d.ts.map

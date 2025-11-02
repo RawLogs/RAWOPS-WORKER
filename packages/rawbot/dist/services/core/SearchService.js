@@ -163,4 +163,3 @@ class SearchService {
     }
 }
 exports.SearchService = SearchService;
-//# sourceMappingURL=SearchService.js.map

@@ -536,4 +536,3 @@ async function smoothRandomScroll(driver, duration = 10000) {
     }
     console.log("Smooth animation scroll completed.");
 }
-//# sourceMappingURL=scroll.js.map

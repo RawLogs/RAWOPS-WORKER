@@ -228,4 +228,3 @@ class WaitOps extends base_1.BaseOps {
     }
 }
 exports.WaitOps = WaitOps;
-//# sourceMappingURL=wait.js.map

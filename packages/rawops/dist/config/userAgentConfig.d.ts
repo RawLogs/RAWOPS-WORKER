@@ -182,4 +182,3 @@ export declare function getActualScreenResolution(): {
     height: number;
 };
 export { POPULAR_USER_AGENTS, CHROME_VERSIONS, WEBKIT_VERSIONS, OPERATING_SYSTEMS, EDGE_VERSIONS, FIREFOX_VERSIONS, SAFARI_VERSIONS, GEOGRAPHIC_REGIONS, DEFAULT_USER_AGENT };
-//# sourceMappingURL=userAgentConfig.d.ts.map

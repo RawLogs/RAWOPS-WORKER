@@ -42,4 +42,3 @@ export declare class YapInitManager {
      */
     static reset(): void;
 }
-//# sourceMappingURL=YapInitManager.d.ts.map

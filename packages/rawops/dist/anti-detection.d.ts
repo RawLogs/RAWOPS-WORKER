@@ -116,4 +116,3 @@ export declare function quickClickWithMouse(driver: WebDriver, element: WebEleme
  * Simulate realistic browsing session
  */
 export declare function simulateBrowsingSession(driver: WebDriver, actions: Array<() => Promise<void>>, pattern?: 'reading' | 'browsing' | 'scanning' | 'casual' | 'focused'): Promise<void>;
-//# sourceMappingURL=anti-detection.d.ts.map

@@ -243,4 +243,3 @@ async function setupBrowser(profile, proxyConfig, mode = 'selenium') {
     log(profile, "Browser setup completed successfully.");
     return driver;
 }
-//# sourceMappingURL=browser-setup.js.map

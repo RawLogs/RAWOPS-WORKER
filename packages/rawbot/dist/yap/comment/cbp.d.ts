@@ -106,4 +106,3 @@ export declare class CommentByProfile {
     private processCommentLink;
     close(): Promise<void>;
 }
-//# sourceMappingURL=cbp.d.ts.map

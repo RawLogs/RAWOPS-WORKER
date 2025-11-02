@@ -100,4 +100,3 @@ class XClient {
     }
 }
 exports.XClient = XClient;
-//# sourceMappingURL=XClient.js.map

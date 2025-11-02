@@ -31,4 +31,3 @@ export declare class RawAI {
         models: string[];
     }>;
 }
-//# sourceMappingURL=index.d.ts.map

@@ -271,6 +271,8 @@ function calculatePackagesChecksum() {
             return;
         }
         const entries = fs.readdirSync(distPath, { withFileTypes: true });
+        // Sort entries by name to ensure consistent order across different file systems
+        entries.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
         for (const entry of entries) {
             const fullPath = path.join(distPath, entry.name);
             // Calculate relative path from packagesDir, not distPath, for consistency
@@ -280,6 +282,10 @@ function calculatePackagesChecksum() {
             if (entry.name === 'node_modules' ||
                 entry.name === '.git' ||
                 entry.name.startsWith('.')) {
+                continue;
+            }
+            // Skip source map files (.map) as they are not needed for checksum and may differ between builds
+            if (entry.isFile() && entry.name.endsWith('.map')) {
                 continue;
             }
             if (entry.isDirectory()) {
@@ -302,6 +308,8 @@ function calculatePackagesChecksum() {
     // Find all packages and process their dist folders
     try {
         const packages = fs.readdirSync(packagesDir, { withFileTypes: true });
+        // Sort packages by name to ensure consistent order
+        packages.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
         for (const pkg of packages) {
             if (pkg.isDirectory()) {
                 const distPath = path.join(packagesDir, pkg.name, 'dist');
