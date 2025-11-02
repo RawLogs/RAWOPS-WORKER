@@ -336,53 +336,15 @@ async function main() {
         // Check for queued runs
         const run = await findAndLockQueuedRun();
         if (run) {
-            // Validate worker version if workerVersionId is provided
-            // TEMPORARILY DISABLED: Checksum validation to fix updateRunStatus errors
+            // Log worker version from API if available
             if (run.workerVersionId && run.workerVersion) {
                 const requiredVersion = run.workerVersion.version;
-                const requiredChecksum = run.workerVersion.checksum;
-                const versionDisplay = `${requiredVersion}${requiredChecksum}`;
                 console.log(`\n[${run.id}] ═══════════════════════════════════════════════════════════════════`);
-                console.log(`[${run.id}] 🔍 WORKER VERSION VALIDATION (TEMPORARILY DISABLED)`);
+                console.log(`[${run.id}] 🔍 WORKER VERSION INFO`);
                 console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════`);
-                console.log(`[${run.id}] 📦 Required Version: ${requiredVersion}`);
-                console.log(`[${run.id}] 🔐 Expected Checksum: ${requiredChecksum}`);
-                // const currentChecksum = calculatePackagesChecksum();
-                // console.log(`[${run.id}] 🔧 Check worker version: ${currentChecksum}`);
-                // TEMPORARILY DISABLED: Skip checksum validation
-                // if (requiredChecksum !== currentChecksum) {
-                //     console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════`);
-                //     console.error(`\n[${run.id}] ❌ VERSION MISMATCH DETECTED`);
-                //     console.error(`[${run.id}] ┌─ Expected:`);
-                //     console.error(`[${run.id}] │  Version:     ${requiredVersion}`);
-                //     console.error(`[${run.id}] │  Checksum:    ${requiredChecksum}`);
-                //     console.error(`[${run.id}] │  Full String: ${versionDisplay}`);
-                //     console.error(`[${run.id}] └─ Actual:`);
-                //     console.error(`[${run.id}]    Checksum:    ${currentChecksum}`);
-                //     console.error(`[${run.id}] ⚠️ Code in packages/ directory has changed. Skipping this run.`);
-                //     console.error(`[${run.id}] 💡 Ensure worker code matches the required version before processing.`);
-                //     console.error(`[${run.id}] ═══════════════════════════════════════════════════════════════════\n`);
-                //     
-                //     await apiService.updateRunStatus(run.id, 'FAILED', {
-                //         error: `Version mismatch: Expected ${versionDisplay}, but code checksum is ${currentChecksum}. Please ensure worker code matches required version.`,
-                //         versionMismatch: true,
-                //         expectedVersion: versionDisplay,
-                //         expectedVersionTag: requiredVersion,
-                //         expectedChecksum: requiredChecksum,
-                //         expectedVersionId: run.workerVersionId,
-                //         actualChecksum: currentChecksum,
-                //         completedAt: new Date()
-                //     });
-                //     return;
-                // } else {
-                //     console.log(`[${run.id}] ✅ Validation successful! Proceeding to process the job.`);
-                //     console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════\n`);
-                // }
-                console.log(`[${run.id}] ⚠️ Checksum validation temporarily disabled - proceeding anyway`);
+                console.log(`[${run.id}] 📦 Version from API: ${requiredVersion}`);
+                console.log(`[${run.id}] 🆔 Version ID: ${run.workerVersionId}`);
                 console.log(`[${run.id}] ═══════════════════════════════════════════════════════════════════\n`);
-            }
-            else {
-                console.log(`[${run.id}] ⚠️ No worker version requirement specified - proceeding without validation`);
             }
             const profileHandle = run.profile?.handle;
             if (!profileHandle || profileHandle === 'unknown') {
