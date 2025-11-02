@@ -240,19 +240,13 @@ function parseProxyString(proxyString) {
  * Only checks dist/ folders because we only copy dist when building
  */
 function calculatePackagesChecksum() {
-    // TARGET: I:\AI\RAWOPS\RAWOPS-AI\packages
-    // Worker in RAWOPS-AI must calculate checksum ONLY from RAWOPS-AI\packages (no fallback)
-    // From: I:\AI\RAWOPS\RAWOPS-AI\apps\worker\src\index.ts
-    // To:   I:\AI\RAWOPS\RAWOPS-AI\packages
     let rootDir = process.cwd();
     let packagesDir = null;
-    // Strategy: Find RAWOPS-AI root directory that contains packages/
-    // If we're in apps/worker/dist or apps/worker/src, go up to find RAWOPS-AI root
     let currentDir = rootDir;
     while (currentDir !== path.dirname(currentDir)) {
         const testPackagesDir = path.join(currentDir, 'packages');
         // Check if this directory contains packages/ AND is RAWOPS-AI
-        if (fs.existsSync(testPackagesDir) && currentDir.includes('RAWOPS-AI')) {
+        if (fs.existsSync(testPackagesDir)) {
             packagesDir = testPackagesDir;
             rootDir = currentDir;
             break;
