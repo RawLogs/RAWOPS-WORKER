@@ -8,7 +8,11 @@ const axios_1 = __importDefault(require("axios"));
 // Database service for rawbot packages to communicate with web API
 class DatabaseService {
     constructor() {
-        this.baseUrl = process.env.WEB_API_URL || 'http://localhost:3000/api';
+        const baseUrl = process.env.WEB_API_URL;
+        if (!baseUrl) {
+            throw new Error('WEB_API_URL environment variable is required');
+        }
+        this.baseUrl = baseUrl;
         this.apiKey = process.env.API_KEY || null;
         console.log('DatabaseService initialized:');
         console.log('- Base URL:', this.baseUrl);

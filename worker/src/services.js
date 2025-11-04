@@ -50,6 +50,57 @@ try {
 catch (error) {
     console.error('Error loading env file:', error);
 }
+function isNetworkError(error) {
+    return error.code === 'ECONNRESET' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ETIMEDOUT' ||
+        error.message?.includes('socket hang up') ||
+        error.message?.includes('ECONNRESET') ||
+        error.message?.includes('timeout');
+}
+function calculateBackoffDelay(attempt, baseDelay = 1000, maxDelay = 5000) {
+    return Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+}
+async function withRetry(operation, options = {}) {
+    const { maxRetries = 3, timeout = 15000, retryOn4xx = false, throwOnFailure = true, operationName = 'Operation', on4xxError } = options;
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await operation();
+            return result;
+        }
+        catch (error) {
+            lastError = error;
+            // Check if it's a network error
+            const isNetwork = isNetworkError(error);
+            // Handle 4xx errors
+            if (error.response?.status >= 400 && error.response?.status < 500) {
+                if (on4xxError) {
+                    return on4xxError(error.response.status, error.response.data);
+                }
+                if (!retryOn4xx) {
+                    throw new Error(`API returned status ${error.response.status}: ${JSON.stringify(error.response.data)}`);
+                }
+            }
+            // Retry on network errors or if retryOn4xx is true
+            if ((isNetwork || retryOn4xx) && attempt < maxRetries) {
+                const delay = calculateBackoffDelay(attempt);
+                console.log(`[Worker] Retry ${attempt}/${maxRetries} for ${operationName} after ${delay}ms (${error.code || error.message})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            // If not retryable or last attempt, break
+            break;
+        }
+    }
+    // All retries failed
+    if (throwOnFailure) {
+        console.error(`[Worker] ❌ Failed ${operationName} after ${maxRetries} attempts:`, lastError?.message || lastError);
+        throw new Error(`Failed ${operationName}: ${lastError?.message || 'Unknown error'}`);
+    }
+    return null;
+}
 // API service for communicating with the web application
 class ApiService {
     constructor() {
@@ -199,72 +250,78 @@ class ApiService {
             return null;
         }
     }
-    async getUserCommentSettings(profileId) {
-        try {
+    async getUserCommentSettings(profileId, retries = 3) {
+        return withRetry(async () => {
             const response = await axios_1.default.get(`${this.baseUrl}/user/comment-settings?profileId=${profileId}`, {
-                headers: this.getHeaders()
+                headers: this.getHeaders(),
+                timeout: 15000,
+                validateStatus: (status) => status < 500
             });
-            return response.data;
-        }
-        catch (error) {
-            console.error('Error getting user comment settings:', error);
-            return null;
-        }
-    }
-    async getUserGrowSettings(profileId) {
-        try {
-            const response = await axios_1.default.get(`${this.baseUrl}/user/grow-settings?profileId=${profileId}`, {
-                headers: this.getHeaders()
-            });
-            return response.data;
-        }
-        catch (error) {
-            console.error('Error getting user grow settings:', error);
-            return null;
-        }
-    }
-    async getUserApiKey(userId) {
-        try {
-            const response = await axios_1.default.get(`${this.baseUrl}/user/api-key`, {
-                headers: this.getHeaders()
-            });
-            return response.data;
-        }
-        catch (error) {
-            console.error('Error getting user API key:', error);
-            return null;
-        }
-    }
-    async getUserPromptSettings(profileId, type = 'COMMENT', retries = 3) {
-        let lastError = null;
-        for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-                const response = await axios_1.default.get(`${this.baseUrl}/user/prompt-settings?profileId=${profileId}&type=${type}`, {
-                    headers: this.getHeaders(),
-                    timeout: 15000
-                });
+            if (response.status >= 200 && response.status < 300) {
                 return response.data;
             }
-            catch (error) {
-                lastError = error;
-                const isNetworkError = error.code === 'ECONNRESET' ||
-                    error.code === 'ECONNREFUSED' ||
-                    error.code === 'ENOTFOUND' ||
-                    error.code === 'ETIMEDOUT' ||
-                    error.message?.includes('socket hang up');
-                if (isNetworkError && attempt < retries) {
-                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
-                    console.log(`[Worker] Retry ${attempt}/${retries} for getUserPromptSettings after ${delay}ms (${error.code || error.message})`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    continue;
-                }
-                // If not network error or last attempt, break and throw
-                break;
+            // Throw for non-2xx responses to trigger retry logic
+            throw { response };
+        }, {
+            maxRetries: retries,
+            operationName: 'getUserCommentSettings',
+            throwOnFailure: true
+        });
+    }
+    async getUserGrowSettings(profileId, retries = 3) {
+        return withRetry(async () => {
+            const response = await axios_1.default.get(`${this.baseUrl}/user/grow-settings?profileId=${profileId}`, {
+                headers: this.getHeaders(),
+                timeout: 15000,
+                validateStatus: (status) => status < 500
+            });
+            if (response.status >= 200 && response.status < 300) {
+                return response.data;
             }
-        }
-        // All retries failed - throw error
-        console.error(`[Worker] ❌ Failed to get user prompt settings after ${retries} attempts:`, lastError?.message || lastError);
-        throw new Error(`Failed to load prompt settings: ${lastError?.message || 'Unknown error'}`);
+            // Throw for non-2xx responses to trigger retry logic
+            throw { response };
+        }, {
+            maxRetries: retries,
+            operationName: 'getUserGrowSettings',
+            throwOnFailure: true
+        });
+    }
+    async getUserApiKey(userId, retries = 3) {
+        const currentUserId = userId; // Capture userId for closure
+        return withRetry(async () => {
+            const response = await axios_1.default.get(`${this.baseUrl}/user/api-key`, {
+                headers: this.getHeaders(),
+                timeout: 15000,
+                validateStatus: (status) => status < 500
+            });
+            if (response.status >= 200 && response.status < 300) {
+                return response.data;
+            }
+            // Throw for non-2xx responses to trigger retry logic
+            throw { response };
+        }, {
+            maxRetries: retries,
+            operationName: 'getUserApiKey',
+            throwOnFailure: true,
+            on4xxError: (status) => {
+                // 4xx means API key not found - return null instead of throwing
+                console.log(`[Worker] API key not found for user ${currentUserId} (status ${status})`);
+                return null;
+            }
+        });
+    }
+    async getUserPromptSettings(profileId, type = 'COMMENT', retries = 3) {
+        return withRetry(async () => {
+            const response = await axios_1.default.get(`${this.baseUrl}/user/prompt-settings?profileId=${profileId}&type=${type}`, {
+                headers: this.getHeaders(),
+                timeout: 15000
+            });
+            return response.data;
+        }, {
+            maxRetries: retries,
+            operationName: 'getUserPromptSettings',
+            throwOnFailure: true
+        });
     }
     async getRunStatus(runId) {
         try {

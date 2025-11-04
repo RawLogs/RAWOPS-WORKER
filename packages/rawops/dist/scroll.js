@@ -332,6 +332,80 @@ class ScrollOps extends base_1.BaseOps {
         }
     }
     /**
+     * Scroll step with customizable times, distance, and direction
+     * Supports both new format (times, distance, randomize) and legacy format (direction, distance as string)
+     */
+    async scrollStep(options = {}) {
+        try {
+            const { times, distance, direction = 'down', randomize = false } = options;
+            if (times !== undefined) {
+                // New format: { times: 2, distance: 800, randomize: true }
+                const actualDistance = typeof distance === 'number' ? distance : 500;
+                const actualDirection = direction;
+                for (let i = 0; i < times; i++) {
+                    const scrollAmount = randomize
+                        ? actualDistance + (Math.random() * 200 - 100) // ±100px variation
+                        : actualDistance;
+                    await this.smoothScrollWithResult({
+                        direction: actualDirection,
+                        scrollAmount,
+                        useAntiDetection: true
+                    });
+                    if (i < times - 1) {
+                        await this.driver.sleep(500 + Math.random() * 500);
+                    }
+                }
+            }
+            else {
+                // Legacy format: { direction: "up", distance: "medium" }
+                const distanceMap = {
+                    short: 200,
+                    medium: 500,
+                    long: 1000
+                };
+                const actualDistance = typeof distance === 'string'
+                    ? (distanceMap[distance] || distanceMap.medium)
+                    : (typeof distance === 'number' ? distance : 500);
+                await this.smoothScrollWithResult({
+                    direction,
+                    scrollAmount: actualDistance,
+                    useAntiDetection: true
+                });
+            }
+            return { success: true };
+        }
+        catch (error) {
+            return { success: false, error: `Error in scroll step: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    }
+    /**
+     * Random scroll with min/max steps
+     */
+    async scrollRandom(options = {}) {
+        try {
+            const { minSteps = 1, maxSteps = 3, direction = 'down', stepDelay = 1000 } = options;
+            const steps = Math.floor(Math.random() * (maxSteps - minSteps + 1)) + minSteps;
+            const actualStepDelay = Array.isArray(stepDelay)
+                ? stepDelay[0] + Math.random() * (stepDelay[1] - stepDelay[0])
+                : stepDelay;
+            for (let i = 0; i < steps; i++) {
+                await this.smoothScrollWithResult({
+                    direction,
+                    scrollAmount: 300 + Math.random() * 200,
+                    steps: 5,
+                    useAntiDetection: true
+                });
+                if (i < steps - 1) {
+                    await this.driver.sleep(actualStepDelay);
+                }
+            }
+            return { success: true };
+        }
+        catch (error) {
+            return { success: false, error: `Error in random scroll: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    }
+    /**
      * Scroll and detect tweets by status ID
      * Returns tweet data when found, or null if not found after max scroll steps
      */
@@ -340,7 +414,7 @@ class ScrollOps extends base_1.BaseOps {
             const { maxScrollSteps = 10, scrollHeight = 800 + Math.random() * 200, scrollDelay = 3000, detectLimit = 10 } = options;
             const detectedTweets = [];
             for (let step = 0; step < maxScrollSteps; step++) {
-                // Get all visible tweets
+                // Get all visible tweets with timestamp extraction
                 const tweets = await this.driver.executeScript(`
           const tweets = document.querySelectorAll('[data-testid="tweet"]');
           const tweetData = [];
@@ -361,11 +435,53 @@ class ScrollOps extends base_1.BaseOps {
             const statusMatch = href.match(/\\/status\\/(\\d+)/);
             const statusId = statusMatch ? statusMatch[1] : null;
             
+            // Extract timestamp - try multiple methods
+            let timestamp = null;
+            try {
+              // Method 1: Direct time element with datetime attribute
+              let timeElement = tweet.querySelector('time[datetime]');
+              if (timeElement) {
+                const datetime = timeElement.getAttribute('datetime');
+                if (datetime) {
+                  timestamp = new Date(datetime).toISOString();
+                }
+              }
+              
+              // Method 2: Find time element within status link
+              if (!timestamp) {
+                const statusLinks = tweet.querySelectorAll('a[href*="/status/"]');
+                for (const link of statusLinks) {
+                  timeElement = link.querySelector('time[datetime]');
+                  if (timeElement) {
+                    const datetime = timeElement.getAttribute('datetime');
+                    if (datetime) {
+                      timestamp = new Date(datetime).toISOString();
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Method 3: Find any time element
+              if (!timestamp) {
+                timeElement = tweet.querySelector('time');
+                if (timeElement) {
+                  const datetime = timeElement.getAttribute('datetime');
+                  if (datetime) {
+                    timestamp = new Date(datetime).toISOString();
+                  }
+                }
+              }
+            } catch (e) {
+              // Timestamp extraction failed, continue without it
+            }
+            
             tweetData.push({
               element: tweet,
               link: href,
               statusId: statusId,
-              cellInnerDiv: cellInnerDiv
+              cellInnerDiv: cellInnerDiv,
+              timestamp: timestamp
             });
           });
           
@@ -388,8 +504,19 @@ class ScrollOps extends base_1.BaseOps {
                             // Scroll to this specific tweet
                             await this.driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', tweet.cellInnerDiv);
                             await this.randomDelay(2000, 3000);
+                            // Add tweet to detectedTweets if not already there
+                            const alreadyDetected = detectedTweets.some(dt => dt.statusId === tweet.statusId);
+                            if (!alreadyDetected && detectedTweets.length < detectLimit) {
+                                detectedTweets.push(tweet);
+                            }
                             return {
-                                tweet,
+                                tweet: {
+                                    element: tweet.element,
+                                    link: tweet.link,
+                                    statusId: tweet.statusId,
+                                    cellInnerDiv: tweet.cellInnerDiv,
+                                    timestamp: tweet.timestamp
+                                },
                                 scrollSteps: step + 1,
                                 detectedTweets
                             };

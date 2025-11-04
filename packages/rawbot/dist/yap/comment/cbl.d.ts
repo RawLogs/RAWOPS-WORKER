@@ -9,6 +9,7 @@ export interface YapCommentSettings {
     };
     links: string[];
     aiModel?: string;
+    aiLanguage?: string;
     commentStyle?: 'casual' | 'professional' | 'enthusiastic' | 'analytical' | 'friendly';
     commentLength?: 'short' | 'medium' | 'long';
     includeHashtags?: boolean;

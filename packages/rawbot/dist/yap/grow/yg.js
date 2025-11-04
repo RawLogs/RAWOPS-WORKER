@@ -38,9 +38,10 @@ exports.YapGrow = void 0;
 const XClient_1 = require("../../client/XClient");
 const drivers_1 = require("../../driver/drivers");
 const rawai_1 = require("@rawops/rawai");
-const selenium_webdriver_1 = require("selenium-webdriver");
 const path = __importStar(require("path"));
 const utils_1 = require("../comment/utils");
+const utils_2 = require("./utils");
+const handlers_1 = require("./handlers");
 /**
  * YapGrow - Automated flow execution based on JSON settings
  * Parses flow configuration and executes actions using driver functions
@@ -118,8 +119,11 @@ class YapGrow {
                 }
             }
             // Filter already processed links
+            console.log(`[YapGrow] Starting workflow with ${settings.links.length} links`);
             const filteredLinks = await (0, utils_1.filterProcessedLinks)(this.cacheDir, settings.links);
+            console.log(`[YapGrow] After filtering processed links: ${filteredLinks.length} links remaining`);
             if (filteredLinks.length === 0) {
+                console.log('[YapGrow] All links have been processed, workflow complete');
                 return {
                     success: true,
                     processedLinks: [],
@@ -137,9 +141,30 @@ class YapGrow {
                 delay_between_links: settings.delay_between_links || 10000,
                 user_delay_follow: settings.user_delay_follow || 2000
             };
-            // Process each link
-            for (let i = 0; i < filteredLinks.length; i++) {
+            // Process each link dynamically (reload filteredLinks after discovery adds new links)
+            let i = 0;
+            let initialFilteredLinksCount = filteredLinks.length;
+            while (true) {
                 if (this.isClosed) {
+                    break;
+                }
+                // Reload filteredLinks from settings.links if discovery added new links
+                // This ensures we process all links including newly discovered ones
+                // Only reload if we've reached the end or if settings.links has more links
+                if (i >= filteredLinks.length || settings.links.length > initialFilteredLinksCount) {
+                    const currentUnprocessedFromSettings = (settings.links || []).filter(l => !processedLinks.includes(l));
+                    const currentFilteredLinks = await (0, utils_1.filterProcessedLinks)(this.cacheDir, currentUnprocessedFromSettings);
+                    // If we have more links now than when we started, update filteredLinks
+                    if (currentFilteredLinks.length > filteredLinks.length || i >= filteredLinks.length) {
+                        console.log(`[YapGrow] 🔄 Reloading links: ${filteredLinks.length} -> ${currentFilteredLinks.length} (discovery may have added new links)`);
+                        filteredLinks.length = 0; // Clear old array
+                        filteredLinks.push(...currentFilteredLinks); // Add new links
+                        initialFilteredLinksCount = filteredLinks.length; // Update initial count
+                    }
+                }
+                // Check if we still have links to process
+                if (i >= filteredLinks.length) {
+                    console.log(`[YapGrow] No more links to process (${i} >= ${filteredLinks.length})`);
                     break;
                 }
                 const link = filteredLinks[i];
@@ -149,9 +174,27 @@ class YapGrow {
                 this.context.following_status = false;
                 this.context.target_status_id = null; // Reset for each link
                 this.context.interaction_result = undefined; // Reset interaction result for each link
+                // Calculate remaining links count for discovery rule evaluation
+                // This is ONLY evaluated at the start of each new link, not during steps
+                // Use settings.links (which may be updated after discovery) instead of filteredLinks
+                // Filter out processed links from current settings.links to get accurate remaining count
+                const currentUnprocessedLinks = (settings.links || []).filter(l => !processedLinks.includes(l));
+                // Also filter by cache if available
+                let remainingLinksCount = currentUnprocessedLinks.length;
                 try {
-                    // Execute steps for this link
-                    const result = await this.executeSteps(settings.steps, settings);
+                    const cacheFiltered = await (0, utils_1.filterProcessedLinks)(this.cacheDir, currentUnprocessedLinks);
+                    remainingLinksCount = cacheFiltered.length;
+                }
+                catch (e) {
+                    // If cache filtering fails, use currentUnprocessedLinks count
+                }
+                // Store remainingLinksCount in context for discovery step (fixed at start of link)
+                // Discovery step will use this value, not recalculate it
+                this.context.remainingLinksCount = remainingLinksCount;
+                try {
+                    // Execute steps for this link (pass processedLinks and remainingLinksCount for discovery)
+                    // Note: remainingLinksCount is fixed at link start, discovery step will use this value
+                    const result = await this.executeSteps(settings.steps, settings, processedLinks, remainingLinksCount);
                     if (result.success) {
                         processedLinks.push(link);
                         if (result.followed)
@@ -162,32 +205,61 @@ class YapGrow {
                             likedCount++;
                         if (result.commented)
                             commentedCount++;
-                        await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'done', {
+                        // Use parallel operations for better performance (same as yap comment)
+                        // Include ruleReason if actions were skipped by rules
+                        const details = {
                             liked: result.liked || false,
                             commented: result.commented || false,
                             followed: result.followed || false,
                             runId: this.runId
-                        });
+                        };
+                        // Add rule reason if actions were skipped by rules
+                        if (result.ruleReason) {
+                            details.ruleReason = result.ruleReason;
+                            console.log(`[YapGrow] ✅ Success (skipped by rules): ${link} - ${result.ruleReason}`);
+                        }
+                        const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'done', details, 'GROW');
+                        // Log any errors from parallel operations
+                        if (parallelResult.errors.length > 0) {
+                            errors.push(...parallelResult.errors);
+                        }
+                        console.log(`[YapGrow] ✅ Successfully processed: ${link}`);
                     }
                     else {
                         failedLinks.push(link);
-                        errors.push(`Failed to process ${link}: ${result.error || 'Unknown error'}`);
-                        await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'failed', {
-                            error: result.error || 'Unknown error',
+                        const errorMsg = result.error || 'Unknown error';
+                        errors.push(`Failed to process ${link}: ${errorMsg}`);
+                        // Use parallel operations for better performance (same as yap comment)
+                        const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'failed', {
+                            error: errorMsg,
                             runId: this.runId
-                        });
+                        }, 'GROW');
+                        // Log any errors from parallel operations
+                        if (parallelResult.errors.length > 0) {
+                            errors.push(...parallelResult.errors);
+                        }
+                        console.log(`[YapGrow] ❌ Failed to process: ${link} - ${errorMsg}`);
                     }
+                    // Move to next link
+                    i++;
                     // Delay between links
-                    if (i < filteredLinks.length - 1) {
+                    if (i < filteredLinks.length) {
                         const delay = this.getDelayValue(settings.delay_between_links || this.context.variables.delay_between_links || 10000);
                         await new Promise(resolve => setTimeout(resolve, delay));
                     }
                 }
                 catch (error) {
-                    failedLinks.push(link);
-                    errors.push(`Error processing ${link}: ${error}`);
+                    // Link might not be defined if error occurs before assignment
+                    const currentLink = link || filteredLinks[i] || 'unknown';
+                    failedLinks.push(currentLink);
+                    const errorMsg = error instanceof Error ? error.message : String(error);
+                    errors.push(`Error processing link ${currentLink}: ${errorMsg}`);
+                    console.error(`[YapGrow] Error processing link ${currentLink}:`, error);
+                    // Move to next link even on error
+                    i++;
                 }
             }
+            console.log(`[YapGrow] Workflow completed: ${followedCount} followed, ${likedCount} liked, ${commentedCount} commented, ${profileExtractedCount} profiles extracted`);
             return {
                 success: true,
                 processedLinks,
@@ -217,7 +289,7 @@ class YapGrow {
     /**
      * Execute steps in order
      */
-    async executeSteps(steps, settings) {
+    async executeSteps(steps, settings, processedLinks = [], remainingLinksCount) {
         if (!this.drivers) {
             return { success: false, error: 'Drivers not initialized' };
         }
@@ -227,7 +299,7 @@ class YapGrow {
                     return { success: false, error: 'Service closed' };
                 }
                 // Execute step with settings for AI comment generation
-                await this.executeStep(step, settings);
+                await this.executeStep(step, settings, processedLinks, remainingLinksCount);
                 // Handle delay after step if specified
                 if (step.ms !== undefined) {
                     const delay = this.resolveVariable(step.ms);
@@ -301,477 +373,81 @@ class YapGrow {
     /**
      * Execute a single step
      */
-    async executeStep(step, settings) {
+    async executeStep(step, settings, processedLinks = [], remainingLinksCount) {
         if (!this.drivers) {
             throw new Error('Drivers not initialized');
         }
         const action = step.action;
         const params = this.resolveStepParams(step);
+        const handlerContext = this.getHandlerContext(processedLinks, remainingLinksCount);
         switch (action) {
             case 'open':
-                await this.handleOpen(params);
+                await (0, handlers_1.handleOpen)(params, handlerContext);
                 break;
             case 'scroll':
-                await this.handleScrollStep(params);
+                await (0, handlers_1.handleScrollStep)(params, handlerContext);
                 break;
             case 'scroll_random':
-                await this.handleScrollRandom(params);
+                await (0, handlers_1.handleScrollRandom)(params, handlerContext);
                 break;
             case 'extract_profile':
-                await this.handleExtractProfile(params);
+                await (0, handlers_1.handleExtractProfile)(params, handlerContext);
                 break;
             case 'wait_until_extract':
-                await this.handleWaitUntilExtractDone(params);
+                await (0, handlers_1.handleWaitUntilExtractDone)(params, handlerContext);
                 break;
             case 'scroll_and_detect':
-                await this.handleScrollAndDetectTweets(params, settings);
+                await (0, handlers_1.handleScrollAndDetectTweets)(params, settings, handlerContext);
+                break;
+            case 'scroll_and_detect_by_time':
+                await (0, handlers_1.handleScrollAndDetectTweetsByTime)(params, settings, handlerContext);
                 break;
             case 'wait':
-                await this.handleWait(params);
+                await (0, handlers_1.handleWait)(params, { ...handlerContext, resolveVariable: (v) => this.resolveVariable(v) });
                 break;
             case 'scroll_to':
-                await this.handleScrollToElement(params);
+                await (0, handlers_1.handleScrollToElement)(params, handlerContext);
                 break;
             case 'follow':
-                await this.handleFollowUser(params);
+                await (0, handlers_1.handleFollowUser)(params, handlerContext, settings);
                 break;
-            case 'report':
-                // This is handled in the main loop
+            case 'discover_followers':
+                await (0, handlers_1.handleDiscoverFollowers)(params, settings, handlerContext);
                 break;
             default:
                 throw new Error(`Unknown action: ${action}`);
         }
     }
     /**
-     * Resolve step params (convert step object to params, excluding 'action' and 'ms')
+     * Resolve step params wrapper
      */
     resolveStepParams(step) {
-        const params = {};
-        for (const [key, value] of Object.entries(step)) {
-            if (key !== 'action' && key !== 'ms') {
-                // Resolve variables in values
-                if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
-                    const varName = value.slice(2, -2);
-                    params[key] = this.resolveVariable(varName);
-                }
-                else {
-                    params[key] = value;
-                }
-            }
-        }
-        return params;
+        return (0, utils_2.resolveStepParams)(step, this.context, (varName) => this.resolveVariable(varName));
     }
     /**
-     * Get delay value from DelaySetting (number or {min, max})
-     * If it's an object, returns random value between min and max
+     * Get delay value wrapper
      */
     getDelayValue(delaySetting) {
-        if (typeof delaySetting === 'number') {
-            return delaySetting;
-        }
-        return Math.random() * (delaySetting.max - delaySetting.min) + delaySetting.min;
+        return (0, utils_2.getDelayValue)(delaySetting);
     }
     /**
-     * Resolve a variable value
+     * Resolve variable wrapper
      */
     resolveVariable(varName) {
-        if (typeof varName === 'number') {
-            return varName;
-        }
-        // Check context variables
-        if (varName === 'current_link') {
-            return this.context.current_link;
-        }
-        if (varName === 'user_delay_follow') {
-            const delaySetting = this.context.variables?.user_delay_follow || 2000;
-            return this.getDelayValue(delaySetting);
-        }
-        if (varName === 'delay_between_links') {
-            const delaySetting = this.context.variables?.delay_between_links || 10000;
-            return this.getDelayValue(delaySetting);
-        }
-        // Check context variables object
-        if (this.context.variables && varName in this.context.variables) {
-            const value = this.context.variables[varName];
-            // If it's a delay setting (object with min/max), resolve it
-            if (typeof value === 'object' && value !== null && 'min' in value && 'max' in value) {
-                return this.getDelayValue(value);
-            }
-            return value;
-        }
-        return varName;
+        return (0, utils_2.resolveVariable)(varName, this.context, (ds) => this.getDelayValue(ds));
     }
     /**
-     * Step handlers
+     * Get handler context
      */
-    async handleOpen(params) {
-        if (!this.drivers)
-            return;
-        const url = params.url;
-        if (!url)
-            throw new Error('URL not provided');
-        // Resolve variable if needed
-        let finalUrl = typeof url === 'string' && url.startsWith('{{') && url.endsWith('}}')
-            ? this.resolveVariable(url.slice(2, -2))
-            : url;
-        // Ensure finalUrl is a string
-        finalUrl = String(finalUrl);
-        // Parse X/Twitter URL to extract status ID and normalize to profile URL only
-        let profileUrl = finalUrl;
-        let statusId = null;
-        try {
-            // Check if URL contains status ID
-            // Pattern: https://x.com/username/status/1234567890
-            // Pattern: https://twitter.com/username/status/1234567890
-            const statusMatch = finalUrl.match(/\/(?:status|statuses)\/(\d+)/);
-            if (statusMatch) {
-                statusId = statusMatch[1];
-                // Extract username from URL and create profile URL only
-                const profileMatch = finalUrl.match(/(?:https?:\/\/)?(?:www\.)?(?:x\.com|twitter\.com)\/([^\/\?]+)/);
-                if (profileMatch) {
-                    const username = profileMatch[1];
-                    // Normalize to profile URL only (remove status part)
-                    profileUrl = `https://x.com/${username}`;
-                }
-            }
-            else {
-                // For profile links, normalize to profile URL
-                const profileMatch = finalUrl.match(/(?:https?:\/\/)?(?:www\.)?(?:x\.com|twitter\.com)\/([^\/\?]+)/);
-                if (profileMatch) {
-                    const username = profileMatch[1];
-                    // Normalize to x.com format
-                    profileUrl = `https://x.com/${username}`;
-                }
-            }
-            // Save status ID to context for handleScrollAndDetectTweets (will detect tweet on profile page)
-            this.context.target_status_id = statusId;
-            console.log(`[YapGrow] Opening profile URL: ${profileUrl}${statusId ? ` (Status ID to detect: ${statusId})` : ''}`);
-        }
-        catch (error) {
-            console.error('[YapGrow] Error parsing URL:', error);
-            // Fallback to original URL
-            profileUrl = finalUrl;
-            this.context.target_status_id = null;
-        }
-        const driver = this.drivers.getDriver();
-        await driver.get(profileUrl);
-        await driver.sleep(2000);
-    }
-    async handleScrollRandom(params) {
-        if (!this.drivers)
-            return;
-        const minSteps = params.min_steps || params.minSteps || 1;
-        const maxSteps = params.max_steps || params.maxSteps || 3;
-        const steps = Math.floor(Math.random() * (maxSteps - minSteps + 1)) + minSteps;
-        const direction = params.direction || 'down';
-        const stepDelay = Array.isArray(params.step_delay) || Array.isArray(params.stepDelay)
-            ? (Array.isArray(params.step_delay) ? params.step_delay : params.stepDelay)[0] +
-                Math.random() * ((Array.isArray(params.step_delay) ? params.step_delay : params.stepDelay)[1] -
-                    (Array.isArray(params.step_delay) ? params.step_delay : params.stepDelay)[0])
-            : (params.step_delay || params.stepDelay || 1000);
-        for (let i = 0; i < steps; i++) {
-            await this.drivers.scroll.smoothScrollWithResult({
-                direction,
-                scrollAmount: 300 + Math.random() * 200,
-                steps: 5,
-                useAntiDetection: true
-            });
-            await new Promise(resolve => setTimeout(resolve, stepDelay));
-        }
-    }
-    async handleExtractProfile(params) {
-        if (!this.drivers || !this.context.current_link)
-            return;
-        const profileUrl = this.context.current_link;
-        const maxTweets = params.max_tweets || params.maxTweets || 5;
-        const profileData = await this.drivers.profile.extractProfileData(profileUrl, {
-            maxTweets
-        });
-        this.context.current_profile = profileData;
-    }
-    async handleWaitUntilExtractDone(params) {
-        const interval = params.interval || params.check_interval || 500;
-        const maxWait = params.max_wait || params.maxWait || 10000; // 10 seconds max
-        let waited = 0;
-        while (!this.context.current_profile && waited < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, interval));
-            waited += interval;
-        }
-    }
-    async handleScrollAndDetectTweets(params, settings) {
-        if (!this.drivers)
-            return;
-        const maxScrollSteps = params.max_scrolls || params.maxScrolls || 5;
-        const detectLimit = params.detect_limit || params.detectLimit || 10;
-        const enableLike = params.enable_like !== false && params.enableLike !== false; // Default true
-        const enableComment = params.enable_comment !== false && params.enableComment !== false; // Default true
-        // Get status ID from (in order of priority):
-        // 1. Explicit parameter in step config
-        // 2. Context (extracted from URL in handleOpen)
-        // 3. Extract from current_link as fallback
-        let statusId = null;
-        if (params.target_status_id !== undefined || params.targetStatusId !== undefined) {
-            statusId = params.target_status_id || params.targetStatusId || null;
-        }
-        else if (this.context.target_status_id !== undefined) {
-            statusId = this.context.target_status_id;
-        }
-        else if (this.context.current_link) {
-            const match = this.context.current_link.match(/\/(?:status|statuses)\/(\d+)/);
-            statusId = match ? match[1] : null;
-        }
-        const result = await this.drivers.scroll.scrollAndDetectTweets(statusId, {
-            maxScrollSteps,
-            detectLimit,
-            scrollHeight: 800 + Math.random() * 200,
-            scrollDelay: 3000
-        });
-        this.context.detected_tweets = result.detectedTweets;
-        // If target tweet found, process interaction
-        if (result.tweet && (enableLike || enableComment)) {
-            this.context.detected_target_tweet = result.tweet;
-            // Scroll to tweet element first
-            const driver = this.drivers.getDriver();
-            try {
-                await driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', result.tweet.cellInnerDiv);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            catch (error) {
-                console.log('[YapGrow] Error scrolling to tweet:', error);
-            }
-            // Extract post content and generate AI comment (if enabled)
-            let commentText = undefined;
-            if (enableComment && settings?.aiCommentEnabled) {
-                // Validate databasePrompt before attempting to generate comment
-                if (!settings.databasePrompt || !settings.databasePrompt.finalPrompt || !settings.databasePrompt.requirePrompt) {
-                    console.error('[YapGrow] ❌ Cannot generate AI comment: databasePrompt is missing or incomplete');
-                    console.error('[YapGrow] Settings check:', {
-                        aiCommentEnabled: settings.aiCommentEnabled,
-                        hasGeminiApiKey: !!settings.geminiApiKey,
-                        hasDatabasePrompt: !!settings.databasePrompt,
-                        hasFinalPrompt: !!(settings.databasePrompt?.finalPrompt),
-                        hasRequirePrompt: !!(settings.databasePrompt?.requirePrompt)
-                    });
-                    // Disable comment if databasePrompt is missing
-                    console.log('[YapGrow] Disabling comment for this tweet due to missing databasePrompt');
-                }
-                else {
-                    try {
-                        // Extract post content directly from tweet element using JavaScript
-                        const postContent = await driver.executeScript(`
-              const tweet = arguments[0];
-              // Find the tweet text element
-              const textElement = tweet.querySelector('[data-testid="tweetText"]');
-              if (textElement) {
-                return textElement.innerText || textElement.textContent || '';
-              }
-              // Fallback: try to get text from article
-              const article = tweet.closest('article');
-              if (article) {
-                const spans = article.querySelectorAll('span');
-                let text = '';
-                spans.forEach(span => {
-                  const spanText = span.innerText || span.textContent || '';
-                  if (spanText.length > 10 && !spanText.includes('@') && !spanText.startsWith('http')) {
-                    text += spanText + ' ';
-                  }
-                });
-                return text.trim();
-              }
-              return '';
-            `, result.tweet.element);
-                        if (postContent && postContent.trim().length > 0) {
-                            console.log('[YapGrow] Extracted post content, generating AI comment...');
-                            console.log(`[YapGrow] Post content preview: "${postContent.substring(0, 100)}..."`);
-                            // Convert YapGrowSettings to YapCommentSettings for generateCommentWithUserStyles
-                            const commentSettings = {
-                                aiCommentEnabled: settings.aiCommentEnabled || false,
-                                aiCommentPrompt: settings.aiCommentPrompt || '',
-                                geminiApiKey: settings.geminiApiKey || '',
-                                delayRange: { min: 0, max: 0 }, // Not used for comment generation
-                                links: [],
-                                aiModel: settings.aiModel,
-                                commentStyle: settings.commentStyle,
-                                commentLength: settings.commentLength,
-                                includeHashtags: settings.includeHashtags,
-                                maxHashtags: settings.maxHashtags,
-                                includeMentions: settings.includeMentions,
-                                maxMentions: settings.maxMentions,
-                                promptStyleMode: settings.promptStyleMode,
-                                selectedPromptStyles: settings.selectedPromptStyles,
-                                promptStyleCategory: settings.promptStyleCategory,
-                                databasePrompt: settings.databasePrompt,
-                                profileId: settings.profileId
-                            };
-                            // Generate comment using AI
-                            const generatedComment = await (0, utils_1.generateCommentWithUserStyles)(postContent.trim(), commentSettings);
-                            if (generatedComment) {
-                                commentText = generatedComment;
-                                console.log(`[YapGrow] Generated AI comment: "${commentText.substring(0, 100)}..."`);
-                            }
-                            else {
-                                console.log('[YapGrow] Failed to generate AI comment, will proceed without comment text');
-                            }
-                        }
-                        else {
-                            console.log('[YapGrow] Could not extract post content from tweet element');
-                        }
-                    }
-                    catch (error) {
-                        console.error('[YapGrow] Error generating AI comment:', error);
-                        // Continue without comment text
-                    }
-                }
-            }
-            // Process interaction (like and comment) using rawops
-            const tweetData = {
-                element: result.tweet.element,
-                link: result.tweet.link,
-                statusId: result.tweet.statusId,
-                cellInnerDiv: result.tweet.cellInnerDiv
-            };
-            const interactionOptions = {
-                enableLike,
-                enableComment,
-                commentText: commentText, // Use AI generated comment or undefined
-                useAntiDetection: true,
-                behavioralPattern: 'browsing',
-                mouseIntensity: 'medium'
-            };
-            const interactionResult = await this.drivers.comment.processTweetInteraction(tweetData, interactionOptions);
-            // Log interaction result for debugging
-            console.log(`[YapGrow] Interaction result:`, interactionResult);
-            this.context.interaction_result = interactionResult;
-        }
-        else {
-            // No tweet found or interactions disabled
-            this.context.detected_target_tweet = null;
-            // If interactions were enabled but no tweet found, set result to indicate no interaction attempted
-            if (enableLike || enableComment) {
-                console.log(`[YapGrow] No tweet detected or interactions disabled, setting interaction_result to { liked: false, commented: false }`);
-                this.context.interaction_result = { liked: false, commented: false };
-            }
-            else {
-                this.context.interaction_result = undefined;
-            }
-        }
-    }
-    async handleScrollStep(params) {
-        if (!this.drivers)
-            return;
-        // Handle different scroll formats
-        if (params.times !== undefined) {
-            // New format: { action: "scroll", times: 2, distance: 800, randomize: true }
-            const times = params.times || 1;
-            const distance = params.distance || 500;
-            const direction = params.direction || 'down';
-            const randomize = params.randomize !== false;
-            for (let i = 0; i < times; i++) {
-                const scrollAmount = randomize
-                    ? distance + (Math.random() * 200 - 100) // ±100px variation
-                    : distance;
-                await this.drivers.scroll.smoothScrollWithResult({
-                    direction,
-                    scrollAmount,
-                    useAntiDetection: true
-                });
-                if (i < times - 1) {
-                    await this.drivers.getDriver().sleep(500 + Math.random() * 500);
-                }
-            }
-        }
-        else {
-            // Legacy format: { action: "scroll", direction: "up", distance: "medium" }
-            const direction = params.direction || 'down';
-            const distanceMap = {
-                short: 200,
-                medium: 500,
-                long: 1000
-            };
-            const distance = params.distance || 'medium';
-            const scrollAmount = typeof distance === 'string'
-                ? (distanceMap[distance] || distanceMap.medium)
-                : (distance || 500);
-            await this.drivers.scroll.smoothScrollWithResult({
-                direction,
-                scrollAmount,
-                useAntiDetection: true
-            });
-        }
-    }
-    async handleWait(params) {
-        // Handle wait/delay actions
-        if (params.min !== undefined && params.max !== undefined) {
-            // Random delay: { action: "wait", min: 1000, max: 3000 }
-            const delay = Math.random() * (params.max - params.min) + params.min;
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        else if (params.ms !== undefined) {
-            // Fixed delay: { action: "wait", ms: 1500 }
-            const delay = this.resolveVariable(params.ms);
-            if (typeof delay === 'number') {
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
-        else if (params.seconds !== undefined) {
-            // Variable delay: { action: "wait", seconds: "{{delay_between_links}}" }
-            const delay = this.resolveVariable(params.seconds);
-            if (typeof delay === 'number') {
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
-    }
-    async handleScrollToElement(params) {
-        if (!this.drivers)
-            return;
-        try {
-            const driver = this.drivers.getDriver();
-            const selector = params.selector;
-            const by = params.by || 'css'; // 'css' or 'xpath'
-            if (!selector)
-                return;
-            let element;
-            if (by === 'xpath') {
-                element = await driver.findElement(selenium_webdriver_1.By.xpath(selector));
-            }
-            else {
-                element = await driver.findElement(selenium_webdriver_1.By.css(selector));
-            }
-            if (element) {
-                await driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', element);
-            }
-        }
-        catch (e) {
-            // Element not found, continue
-        }
-    }
-    async handleFollowUser(params) {
-        if (!this.drivers)
-            return;
-        // Always check following status first (auto-check, driver handles automatically)
-        this.context.following_status = await this.drivers.profile.isAlreadyFollowing();
-        const isFollowing = this.context.following_status;
-        // If already following, skip (this is success, keep status as true)
-        if (isFollowing) {
-            console.log(`[YapGrow] Already following, skipping follow action`);
-            return;
-        }
-        // Attempt to follow and check result
-        const result = await this.drivers.profile.followProfile({
-            useAntiDetection: true,
-            behavioralPattern: 'browsing',
-            mouseIntensity: 'medium'
-        });
-        // Only set following_status to true if follow was successful
-        if (result.success) {
-            this.context.following_status = true;
-            console.log(`[YapGrow] Follow successful`);
-        }
-        else {
-            // Follow failed, keep status as false
-            this.context.following_status = false;
-            console.log(`[YapGrow] Follow failed: ${result.error || 'Unknown error'}`);
-        }
+    getHandlerContext(processedLinks = [], remainingLinksCount) {
+        return {
+            drivers: this.drivers,
+            context: this.context,
+            cacheDir: this.cacheDir,
+            resolveVariable: (varName) => this.resolveVariable(varName),
+            processedLinks,
+            remainingLinksCount
+        };
     }
     async close() {
         // Set closed flag first

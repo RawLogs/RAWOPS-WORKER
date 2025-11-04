@@ -49,6 +49,17 @@ exports.filterProcessedLinks = filterProcessedLinks;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 /**
+ * Get API base URL from environment variable
+ * Throws error if WEB_API_URL is not set
+ */
+function getApiBaseUrl() {
+    const baseUrl = process.env.WEB_API_URL;
+    if (!baseUrl) {
+        throw new Error('WEB_API_URL environment variable is required');
+    }
+    return baseUrl;
+}
+/**
  * Helper function to handle fetch timeout errors gracefully
  */
 function handleFetchTimeout(error, operation) {
@@ -100,11 +111,14 @@ async function saveToCache(cacheDir, type, link, data) {
         const wasUpdate = !!existingEntry;
         // Remove any existing entries for the same URL to avoid duplicates
         existingData = existingData.filter((item) => item.url !== link);
-        // Add new entry
+        // Add new entry - normalize follow/followed fields
         const entry = {
             url: link,
             timestamp: new Date().toISOString(),
             runId: data.runId || null, // Add runId to track which run this belongs to
+            liked: data.liked || false,
+            commented: data.commented || false,
+            followed: data.followed || false, // Support both 'followed' and 'follow' fields
             ...data
         };
         existingData.push(entry);
@@ -116,7 +130,10 @@ async function saveToCache(cacheDir, type, link, data) {
         fs.writeFileSync(filePath, JSON.stringify(filteredData, null, 2));
         // Log the action (update or new entry)
         const action = wasUpdate ? 'Updated' : 'Added';
-        console.log(`[YapComment] ${action} to ${type}.json: ${link}`);
+        const followStatus = entry.followed ? ' (followed)' : '';
+        const likeStatus = entry.liked ? ' (liked)' : '';
+        const commentStatus = entry.commented ? ' (commented)' : '';
+        console.log(`[YapComment] ${action} to ${type}.json: ${link}${likeStatus}${commentStatus}${followStatus}`);
     }
     catch (error) {
         console.error(`[YapComment] Error saving to ${type} cache:`, error);
@@ -127,7 +144,7 @@ async function saveToCache(cacheDir, type, link, data) {
  */
 async function getLatestLogTimestamp(sessionId, profileId) {
     try {
-        const response = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs?sessionId=${sessionId}&profileId=${profileId}&limit=1`, {
+        const response = await fetch(`${getApiBaseUrl()}/interaction-logs?sessionId=${sessionId}&profileId=${profileId}&limit=1`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${process.env.API_KEY}`
@@ -158,7 +175,7 @@ async function getLatestLogTimestamp(sessionId, profileId) {
  */
 async function checkExistingLogs(sessionId, profileId, links) {
     try {
-        const response = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs?sessionId=${sessionId}&profileId=${profileId}`, {
+        const response = await fetch(`${getApiBaseUrl()}/interaction-logs?sessionId=${sessionId}&profileId=${profileId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${process.env.API_KEY}`
@@ -209,7 +226,7 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
         if (runId) {
             try {
                 console.log(`[${serviceName}] Creating interaction session for run: ${runId}`);
-                const sessionResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-sessions`, {
+                const sessionResponse = await fetch(`${getApiBaseUrl()}/interaction-sessions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -247,7 +264,7 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
                 }
                 // Step 1: Get list of links that are NOT already in database with DONE status
                 console.log(`[${serviceName}] Checking pending links from ${originalInputLinks.length} total input links...`);
-                const pendingResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs/pending`, {
+                const pendingResponse = await fetch(`${getApiBaseUrl()}/interaction-logs/pending`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -330,7 +347,7 @@ async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT',
                         };
                     })
                 ];
-                const logsResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs`, {
+                const logsResponse = await fetch(`${getApiBaseUrl()}/interaction-logs`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -395,7 +412,7 @@ async function saveLinkStatusToAPI(profileId, link, status, details) {
         try {
             // console.log(`[YapComment] Saving link status to API: ${link} -> ${status} (attempt ${attempt}/${maxRetries})`);
             // Get current comment config to preserve existing data
-            const getResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/profile/comment-config?profileId=${profileId}`, {
+            const getResponse = await fetch(`${getApiBaseUrl()}/profile/comment-config?profileId=${profileId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${process.env.API_KEY}`
@@ -431,7 +448,7 @@ async function saveLinkStatusToAPI(profileId, link, status, details) {
                 }
             }
             // Update the API with the new status
-            const response = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/profile/comment-config`, {
+            const response = await fetch(`${getApiBaseUrl()}/profile/comment-config`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -471,7 +488,8 @@ async function saveLinkStatusToAPI(profileId, link, status, details) {
 /**
  * Submit a single link to interaction-logs API
  */
-async function submitSingleLinkToInteractionLogs(profileId, link, status, details) {
+async function submitSingleLinkToInteractionLogs(profileId, link, status, details, runType = 'COMMENT' // 'COMMENT', 'GROW', 'CBP', 'CBL'
+) {
     const maxRetries = 3;
     const retryDelay = 1000; // 1 second
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -481,7 +499,7 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
             let sessionId = null;
             if (details.runId) {
                 try {
-                    const sessionResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-sessions`, {
+                    const sessionResponse = await fetch(`${getApiBaseUrl()}/interaction-sessions`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -490,7 +508,7 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
                         body: JSON.stringify({
                             profileId: profileId,
                             runId: details.runId,
-                            type: 'COMMENT',
+                            type: runType,
                             totalLinks: 1
                         }),
                         signal: AbortSignal.timeout(10000) // 10 second timeout
@@ -508,7 +526,7 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
             if (sessionId) {
                 const log = {
                     link: link,
-                    type: 'COMMENT',
+                    type: runType,
                     action: status === 'done' ? 'SUCCESS' : 'FAILED',
                     status: status === 'done' ? 'DONE' : 'FAIL',
                     details: {
@@ -522,7 +540,7 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
                         })
                     }
                 };
-                const logsResponse = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/interaction-logs`, {
+                const logsResponse = await fetch(`${getApiBaseUrl()}/interaction-logs`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -568,7 +586,8 @@ async function submitSingleLinkToInteractionLogs(profileId, link, status, detail
  * Combined function to save cache and submit API calls in parallel using Promise.all
  * This optimizes performance by running multiple operations simultaneously
  */
-async function saveCacheAndSubmitAPI(cacheDir, profileId, link, status, details) {
+async function saveCacheAndSubmitAPI(cacheDir, profileId, link, status, details, runType = 'COMMENT' // 'COMMENT', 'GROW', 'CBP', 'CBL'
+) {
     const results = {
         cacheSuccess: false,
         apiSuccess: false,
@@ -601,7 +620,7 @@ async function saveCacheAndSubmitAPI(cacheDir, profileId, link, status, details)
         promises.push(apiPromise);
         // 3. Submit to interaction-logs API (if runId is provided)
         if (details.runId) {
-            const interactionLogsPromise = submitSingleLinkToInteractionLogs(profileId, link, status, details)
+            const interactionLogsPromise = submitSingleLinkToInteractionLogs(profileId, link, status, details, runType)
                 .then(() => {
                 results.interactionLogsSuccess = true;
             })
@@ -632,7 +651,7 @@ async function updateRemainingLinksAPI(profileId, remainingLinks) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`[YapComment] Updating API with ${remainingLinks.length} remaining links... (attempt ${attempt}/${maxRetries})`);
-            const response = await fetch(`${process.env.WEB_API_URL || 'http://localhost:3000/api'}/profile/comment-config`, {
+            const response = await fetch(`${getApiBaseUrl()}/profile/comment-config`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -795,22 +814,65 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 finalFailedToSubmit = [...currentFailed];
                 console.log(`[${serviceName}] No original links provided, submitting all local cache data (done/failed only)`);
             }
-            // Choose API endpoint based on runType
-            const apiEndpoint = runType === 'GROW'
-                ? `${process.env.WEB_API_URL || 'http://localhost:3000/api'}/user/grow-settings?profileId=${profileId}`
-                : `${process.env.WEB_API_URL || 'http://localhost:3000/api'}/profile/comment-config`;
+            // Choose API endpoint and prepare body based on runType
+            let apiEndpoint;
+            let requestBody;
+            if (runType === 'GROW') {
+                // For GROW, we need to fetch existing settings and merge done/failed
+                apiEndpoint = `${getApiBaseUrl()}/user/grow-settings?profileId=${profileId}`;
+                try {
+                    // Fetch existing settings first
+                    const getResponse = await fetch(`${getApiBaseUrl()}/user/grow-settings?profileId=${profileId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${process.env.API_KEY}`
+                        },
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    let existingSettings = {};
+                    if (getResponse.ok) {
+                        existingSettings = await getResponse.json();
+                    }
+                    // Merge done and failed into existing settings
+                    requestBody = {
+                        profileId: profileId,
+                        settings: {
+                            ...existingSettings,
+                            done: finalDoneToSubmit,
+                            failed: finalFailedToSubmit
+                        }
+                    };
+                }
+                catch (fetchError) {
+                    console.error(`[${serviceName}] Error fetching existing settings:`, fetchError);
+                    // Fallback: create minimal settings object
+                    requestBody = {
+                        profileId: profileId,
+                        settings: {
+                            links: originalLinks || [],
+                            done: finalDoneToSubmit,
+                            failed: finalFailedToSubmit
+                        }
+                    };
+                }
+            }
+            else {
+                // For COMMENT, use the old format
+                apiEndpoint = `${getApiBaseUrl()}/profile/comment-config`;
+                requestBody = {
+                    profileId: profileId,
+                    done: finalDoneToSubmit,
+                    failed: finalFailedToSubmit
+                };
+            }
             const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${process.env.API_KEY}`
                 },
-                body: JSON.stringify({
-                    profileId: profileId, // Use profile ID for API
-                    // Don't submit links, only update done/failed status
-                    done: finalDoneToSubmit, // Only done links from original
-                    failed: finalFailedToSubmit // Only failed links from original
-                }),
+                body: JSON.stringify(requestBody),
                 signal: AbortSignal.timeout(10000) // 10 second timeout
             });
             if (response.ok) {

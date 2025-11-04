@@ -57,4 +57,19 @@ export declare class WaitOps extends BaseOps {
      * Wait for form to be ready
      */
     waitForFormReady(formSelector?: string, timeout?: number): Promise<InteractionResult>;
+    /**
+     * Wait with fixed delay in milliseconds
+     */
+    waitWithDelay(ms: number): Promise<InteractionResult>;
+    /**
+     * Wait with variable delay (resolves variable value first)
+     */
+    waitVariable(delayValue: number | string, resolveVariable?: (varName: string | number) => any): Promise<InteractionResult>;
+    /**
+     * Wait until condition is met (with interval checking)
+     */
+    waitUntilCondition(condition: () => boolean | Promise<boolean>, options?: {
+        interval?: number;
+        maxWait?: number;
+    }): Promise<InteractionResult>;
 }

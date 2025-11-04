@@ -1,5 +1,5 @@
 import { WebDriver } from 'selenium-webdriver';
-import { CommentOps, LikeOps, ScrollOps, ExtractionOps, UsernameExtractionOps, ProfileOps, CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult } from '@rawops/rawops';
+import { CommentOps, LikeOps, ScrollOps, ExtractionOps, UsernameExtractionOps, ProfileOps, FollowerDiscoveryOps, GrowOps, WaitOps, CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult, FollowerDiscoveryOptions, DiscoveredFollower, FollowerDiscoveryResult, ParseUrlResult, ScrollAndDetectTweetsByTimeOptions, FilteredTweet, ScrollAndDetectTweetsByTimeResult } from '@rawops/rawops';
 import { calculateFollowRatio } from '@rawops/rawops';
 /**
  * Unified Drivers class that aggregates all driver operations from rawops package
@@ -25,6 +25,9 @@ export declare class Drivers {
     readonly extraction: ExtractionOps;
     readonly usernameExtraction: UsernameExtractionOps;
     readonly profile: ProfileOps;
+    readonly followerDiscovery: FollowerDiscoveryOps;
+    readonly grow: GrowOps;
+    readonly wait: WaitOps;
     constructor(driver: WebDriver);
     /**
      * Get the underlying WebDriver instance
@@ -35,5 +38,5 @@ export declare class Drivers {
      */
     isInitialized(): boolean;
 }
-export type { CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult };
+export type { CommentOptions, LikeOptions, ScrollOptions, ExtractionOptions, UsernameExtractionOptions, ExtractProfileOps, FollowOps, InteractionResult, TweetMetadata, UsernameSearchResult, ProfileData, FollowRatioResult, FollowerDiscoveryOptions, DiscoveredFollower, FollowerDiscoveryResult, ParseUrlResult, ScrollAndDetectTweetsByTimeOptions, FilteredTweet, ScrollAndDetectTweetsByTimeResult };
 export { calculateFollowRatio };

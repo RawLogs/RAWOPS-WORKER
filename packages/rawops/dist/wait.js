@@ -226,5 +226,61 @@ class WaitOps extends base_1.BaseOps {
             return { success: false, error: `Error waiting for form ready: ${error}` };
         }
     }
+    /**
+     * Wait with fixed delay in milliseconds
+     */
+    async waitWithDelay(ms) {
+        try {
+            await this.driver.sleep(ms);
+            return { success: true };
+        }
+        catch (error) {
+            return { success: false, error: `Error waiting: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    }
+    /**
+     * Wait with variable delay (resolves variable value first)
+     */
+    async waitVariable(delayValue, resolveVariable) {
+        try {
+            let delay;
+            if (typeof delayValue === 'number') {
+                delay = delayValue;
+            }
+            else if (typeof delayValue === 'string' && resolveVariable) {
+                const resolved = resolveVariable(delayValue);
+                delay = typeof resolved === 'number' ? resolved : 1000;
+            }
+            else {
+                delay = 1000;
+            }
+            await this.driver.sleep(delay);
+            return { success: true };
+        }
+        catch (error) {
+            return { success: false, error: `Error waiting: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    }
+    /**
+     * Wait until condition is met (with interval checking)
+     */
+    async waitUntilCondition(condition, options = {}) {
+        try {
+            const { interval = 500, maxWait = 10000 } = options;
+            let waited = 0;
+            while (waited < maxWait) {
+                const result = await condition();
+                if (result) {
+                    return { success: true };
+                }
+                await this.driver.sleep(interval);
+                waited += interval;
+            }
+            return { success: false, error: 'Condition timeout' };
+        }
+        catch (error) {
+            return { success: false, error: `Error waiting for condition: ${error instanceof Error ? error.message : String(error)}` };
+        }
+    }
 }
 exports.WaitOps = WaitOps;

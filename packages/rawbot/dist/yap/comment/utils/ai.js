@@ -114,7 +114,7 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
             maxHashtags: settings.maxHashtags || 2,
             includeMentions: settings.includeMentions || false,
             maxMentions: settings.maxMentions || 1,
-            language: 'English',
+            language: settings.aiLanguage || 'English',
             commentContent: commentContent,
             commentUsername: commentUsername
         }, promptToUse, settings.databasePrompt || undefined);

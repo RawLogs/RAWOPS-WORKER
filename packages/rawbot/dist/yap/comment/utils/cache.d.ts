@@ -37,7 +37,7 @@ export declare function submitSingleLinkToInteractionLogs(profileId: string, lin
     followed?: boolean;
     error?: string;
     runId?: string;
-}): Promise<void>;
+}, runType?: string): Promise<void>;
 /**
  * Combined function to save cache and submit API calls in parallel using Promise.all
  * This optimizes performance by running multiple operations simultaneously
@@ -48,7 +48,7 @@ export declare function saveCacheAndSubmitAPI(cacheDir: string, profileId: strin
     followed?: boolean;
     error?: string;
     runId?: string;
-}): Promise<{
+}, runType?: string): Promise<{
     cacheSuccess: boolean;
     apiSuccess: boolean;
     interactionLogsSuccess: boolean;

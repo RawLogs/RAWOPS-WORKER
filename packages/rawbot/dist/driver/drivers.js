@@ -34,6 +34,9 @@ class Drivers {
         this.extraction = new rawops_1.ExtractionOps(driver);
         this.usernameExtraction = new rawops_1.UsernameExtractionOps(driver);
         this.profile = new rawops_1.ProfileOps(driver);
+        this.followerDiscovery = new rawops_1.FollowerDiscoveryOps(driver);
+        this.grow = new rawops_1.GrowOps(driver);
+        this.wait = new rawops_1.WaitOps(driver);
     }
     /**
      * Get the underlying WebDriver instance

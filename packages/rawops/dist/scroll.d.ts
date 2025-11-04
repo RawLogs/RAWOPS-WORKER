@@ -49,6 +49,25 @@ export declare class ScrollOps extends BaseOps {
      */
     infiniteScroll(options?: ScrollOptions): Promise<InteractionResult>;
     /**
+     * Scroll step with customizable times, distance, and direction
+     * Supports both new format (times, distance, randomize) and legacy format (direction, distance as string)
+     */
+    scrollStep(options?: {
+        times?: number;
+        distance?: number | string;
+        direction?: 'up' | 'down';
+        randomize?: boolean;
+    }): Promise<InteractionResult>;
+    /**
+     * Random scroll with min/max steps
+     */
+    scrollRandom(options?: {
+        minSteps?: number;
+        maxSteps?: number;
+        direction?: 'up' | 'down';
+        stepDelay?: number | [number, number];
+    }): Promise<InteractionResult>;
+    /**
      * Scroll and detect tweets by status ID
      * Returns tweet data when found, or null if not found after max scroll steps
      */
@@ -63,6 +82,7 @@ export declare class ScrollOps extends BaseOps {
             link: string;
             statusId: string | null;
             cellInnerDiv: any;
+            timestamp: string | null;
         } | null;
         scrollSteps: number;
         detectedTweets: Array<{
@@ -70,6 +90,7 @@ export declare class ScrollOps extends BaseOps {
             link: string;
             statusId: string | null;
             cellInnerDiv: any;
+            timestamp: string | null;
         }>;
     }>;
 }

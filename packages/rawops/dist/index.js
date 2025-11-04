@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
+exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.GrowOps = exports.FollowerDiscoveryOps = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
 // Import all operation classes
 const base_1 = require("./base");
 Object.defineProperty(exports, "BaseOps", { enumerable: true, get: function () { return base_1.BaseOps; } });
@@ -24,6 +24,10 @@ const username_extraction_1 = require("./username-extraction");
 Object.defineProperty(exports, "UsernameExtractionOps", { enumerable: true, get: function () { return username_extraction_1.UsernameExtractionOps; } });
 const profile_1 = require("./profile");
 Object.defineProperty(exports, "ProfileOps", { enumerable: true, get: function () { return profile_1.ProfileOps; } });
+const discovery_1 = require("./discovery");
+Object.defineProperty(exports, "FollowerDiscoveryOps", { enumerable: true, get: function () { return discovery_1.FollowerDiscoveryOps; } });
+const grow_1 = require("./grow");
+Object.defineProperty(exports, "GrowOps", { enumerable: true, get: function () { return grow_1.GrowOps; } });
 const error_driver_1 = require("./error-driver");
 Object.defineProperty(exports, "ErrorDriver", { enumerable: true, get: function () { return error_driver_1.ErrorDriver; } });
 // Import anti-detection integration
@@ -71,6 +75,8 @@ class RawOps {
         this.extraction = new extraction_1.ExtractionOps(driver);
         this.usernameExtraction = new username_extraction_1.UsernameExtractionOps(driver);
         this.profile = new profile_1.ProfileOps(driver);
+        this.followerDiscovery = new discovery_1.FollowerDiscoveryOps(driver);
+        this.grow = new grow_1.GrowOps(driver);
         this.errorDriver = new error_driver_1.ErrorDriver(driver);
         this.antiDetection = new anti_detection_1.AntiDetectionIntegration(driver, initialBehavioralPattern);
     }

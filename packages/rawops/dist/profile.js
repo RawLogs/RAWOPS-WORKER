@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProfileOps = void 0;
 exports.calculateFollowRatio = calculateFollowRatio;
-const selenium_webdriver_1 = require("selenium-webdriver");
 const base_1 = require("./base");
 /**
  * ProfileOps class for profile-related operations
@@ -66,9 +65,6 @@ class ProfileOps extends base_1.BaseOps {
      */
     async extractProfileData(profileUrl, options = {}) {
         try {
-            const { maxTweets = 5 } = options;
-            await this.driver.get(profileUrl);
-            await this.randomDelay(2000, 3000);
             let profileData = {
                 url: profileUrl,
                 username: '',
@@ -173,80 +169,6 @@ class ProfileOps extends base_1.BaseOps {
             }
             catch (e) {
                 // Could not extract bio
-            }
-            // Extract latest tweets with timestamps
-            try {
-                const tweetElements = await this.findElementsByCss('[data-testid="tweet"]');
-                let attempts = 0;
-                for (let tweetElement of tweetElements) {
-                    if (attempts >= maxTweets)
-                        break;
-                    attempts++;
-                    try {
-                        // Skip pinned tweets
-                        const pinnedIndicator = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="pin"]'));
-                        if (pinnedIndicator.length > 0) {
-                            continue;
-                        }
-                        // Check if this is a retweet (has retweet indicator)
-                        const retweetIndicator = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="socialContext"]'));
-                        if (retweetIndicator.length > 0) {
-                            const retweetText = await retweetIndicator[0].getText();
-                            if (retweetText.includes('Retweeted') || retweetText.includes('Reposted') ||
-                                retweetText.includes('đã đăng lại') || retweetText.includes('You reposted')) {
-                                continue;
-                            }
-                        }
-                        // Get tweet content from profile page
-                        const tweetText = await tweetElement.findElement(selenium_webdriver_1.By.css('[data-testid="tweetText"]'));
-                        const tweetContent = await tweetText.getText();
-                        // Skip if tweet content is empty or too short
-                        if (!tweetContent || tweetContent.trim().length < 10) {
-                            continue;
-                        }
-                        // Get tweet URL from profile page
-                        const tweetLink = await tweetElement.findElement(selenium_webdriver_1.By.css('a[href*="/status/"]'));
-                        const tweetUrl = await tweetLink.getAttribute('href');
-                        // Extract tweet timestamp
-                        let tweetDate = null;
-                        try {
-                            const timeElement = await tweetElement.findElement(selenium_webdriver_1.By.css('time'));
-                            const datetime = await timeElement.getAttribute('datetime');
-                            if (datetime) {
-                                tweetDate = new Date(datetime);
-                            }
-                        }
-                        catch (e) {
-                            // Ignore if can't extract timestamp
-                        }
-                        // Get basic interaction counts
-                        let likeCount = 0, retweetCount = 0, replyCount = 0;
-                        try {
-                            const replyElements = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="reply"]'));
-                            if (replyElements.length > 0) {
-                                const replyText = await replyElements[0].getText();
-                                replyCount = parseInt(replyText.replace(/[^\d]/g, '')) || 0;
-                            }
-                        }
-                        catch (e) {
-                            // Ignore if can't get counts
-                        }
-                        profileData.tweets.push({
-                            content: tweetContent,
-                            url: tweetUrl,
-                            comment_count: replyCount,
-                            like_count: likeCount,
-                            retweet_count: retweetCount,
-                            date: tweetDate
-                        });
-                    }
-                    catch (e) {
-                        // Error extracting tweet
-                    }
-                }
-            }
-            catch (e) {
-                // Could not extract tweets
             }
             return profileData;
         }

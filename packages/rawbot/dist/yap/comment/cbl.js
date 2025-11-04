@@ -141,7 +141,7 @@ class CommentByLink {
                             liked: result.liked,
                             commented: result.commented,
                             runId: this.runId
-                        });
+                        }, 'COMMENT');
                         // Log any errors from parallel operations
                         if (parallelResult.errors.length > 0) {
                             errors.push(...parallelResult.errors);
@@ -159,7 +159,7 @@ class CommentByLink {
                             commented: result.commented,
                             error: errorMsg,
                             runId: this.runId
-                        });
+                        }, 'COMMENT');
                         // Log any errors from parallel operations
                         if (parallelResult.errors.length > 0) {
                             errors.push(...parallelResult.errors);
