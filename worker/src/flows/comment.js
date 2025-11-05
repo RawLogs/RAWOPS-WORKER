@@ -32,15 +32,6 @@ async function runCommentFlow(run, apiService, activeBrowsers) {
         }
         // Process cache to filter out already processed links
         const processedSettings = await (0, cache_1.processCacheForRun)(run, settings);
-        console.log(`[${run.id}] Loaded comment settings:`, {
-            linksCount: processedSettings.links.length,
-            aiEnabled: processedSettings.aiCommentEnabled,
-            hasGeminiApiKey: !!processedSettings.geminiApiKey,
-            hasDatabasePrompt: !!processedSettings.databasePrompt,
-            userId: userId,
-            commentMode: processedSettings.commentMode || 'cml'
-        });
-        // Stop run if AI is disabled - BEFORE initializing browser
         // AI must be explicitly true to proceed, otherwise stop the worker
         if (processedSettings.aiCommentEnabled !== true) {
             console.log(`[${run.id}] AI comment is disabled or not enabled, stopping run`);

@@ -54,96 +54,109 @@ async function processCacheForRun(run, settings) {
         // Read existing cache files
         const donePath = path.join(cacheDir, 'done.json');
         const failedPath = path.join(cacheDir, 'failed.json');
-        let doneLinks = [];
-        let failedLinks = [];
-        // Read done links
+        let doneData = [];
+        let failedData = [];
+        // Read done links (keep full objects to preserve format)
         if (fs.existsSync(donePath)) {
             try {
-                const doneData = JSON.parse(fs.readFileSync(donePath, 'utf8'));
-                doneLinks = doneData.map((item) => item.url);
-                console.log(`[${run.id}] Found ${doneLinks.length} done links in cache`);
+                doneData = JSON.parse(fs.readFileSync(donePath, 'utf8'));
+                console.log(`[${run.id}] Found ${doneData.length} done links in cache`);
             }
             catch (error) {
                 console.error(`[${run.id}] Error reading done.json:`, error);
             }
         }
-        // Read failed links
+        // Read failed links (keep full objects to get runId and other info)
         if (fs.existsSync(failedPath)) {
             try {
-                const failedData = JSON.parse(fs.readFileSync(failedPath, 'utf8'));
-                failedLinks = failedData.map((item) => item.url);
-                console.log(`[${run.id}] Found ${failedLinks.length} failed links in cache`);
+                failedData = JSON.parse(fs.readFileSync(failedPath, 'utf8'));
+                console.log(`[${run.id}] Found ${failedData.length} failed links in cache`);
             }
             catch (error) {
                 console.error(`[${run.id}] Error reading failed.json:`, error);
             }
         }
+        // Extract URLs for comparison
+        const doneLinks = doneData.map((item) => item.url);
+        const failedLinks = failedData.map((item) => item.url);
         // Clean up failed links that are now in done
-        const originalFailedCount = failedLinks.length;
+        const originalFailedCount = failedData.length;
         const linksToRemoveFromFailed = failedLinks.filter(link => doneLinks.includes(link));
-        failedLinks = failedLinks.filter(link => !doneLinks.includes(link));
-        if (originalFailedCount !== failedLinks.length) {
-            console.log(`[${run.id}] Cleaned up ${originalFailedCount - failedLinks.length} failed links that are now done`);
+        // Get failed entries that need to be moved to done (BEFORE filtering)
+        const failedEntriesToMove = failedData.filter((item) => linksToRemoveFromFailed.includes(item.url));
+        // Filter out failed entries that are now in done
+        failedData = failedData.filter((item) => !doneLinks.includes(item.url));
+        if (originalFailedCount !== failedData.length) {
+            console.log(`[${run.id}] Cleaned up ${originalFailedCount - failedData.length} failed links that are now done`);
             console.log(`[${run.id}] Links moved from failed to done: ${linksToRemoveFromFailed.join(', ')}`);
             // Log each retry success individually
             for (const link of linksToRemoveFromFailed) {
                 console.log(`[${run.id}] ✅ RETRY SUCCESS: ${link} - Reason: retry done`);
             }
             // Update failed.json with remaining failed links only
-            const updatedFailedData = failedLinks.map(link => ({
-                url: link,
-                timestamp: new Date().toISOString(),
-                reason: 'Still failed - needs retry'
-            }));
-            fs.writeFileSync(failedPath, JSON.stringify(updatedFailedData, null, 2));
-            console.log(`[${run.id}] Updated failed.json with ${updatedFailedData.length} remaining failed links`);
-            // Add the moved links to done.json
+            fs.writeFileSync(failedPath, JSON.stringify(failedData, null, 2));
+            console.log(`[${run.id}] Updated failed.json with ${failedData.length} remaining failed links`);
+            // Add the moved links to done.json with correct format
             if (linksToRemoveFromFailed.length > 0) {
-                const doneData = doneLinks.map(link => ({
-                    url: link,
+                // Create new done entries with correct format from failed entries
+                const newDoneEntries = failedEntriesToMove.map((failedEntry) => ({
+                    url: failedEntry.url,
                     timestamp: new Date().toISOString(),
-                    status: 'DONE',
-                    movedFromFailed: linksToRemoveFromFailed.includes(link),
-                    retrySuccess: linksToRemoveFromFailed.includes(link) ? 'retry done' : undefined
+                    runId: failedEntry.runId || run.id, // Use runId from failed entry or current run.id
+                    liked: failedEntry.liked || false,
+                    commented: failedEntry.commented || false,
+                    followed: failedEntry.followed || false
                 }));
-                fs.writeFileSync(donePath, JSON.stringify(doneData, null, 2));
-                console.log(`[${run.id}] Updated done.json with ${doneData.length} done links (including ${linksToRemoveFromFailed.length} moved from failed)`);
+                // Add new entries to done.json (keep existing entries)
+                const updatedDoneData = [...doneData];
+                // Add or update entries for moved links
+                for (const newEntry of newDoneEntries) {
+                    const existingIndex = updatedDoneData.findIndex((item) => item.url === newEntry.url);
+                    if (existingIndex >= 0) {
+                        // Update existing entry, preserve format but ensure runId exists
+                        updatedDoneData[existingIndex] = {
+                            ...updatedDoneData[existingIndex],
+                            runId: updatedDoneData[existingIndex].runId || newEntry.runId,
+                            liked: updatedDoneData[existingIndex].liked ?? newEntry.liked,
+                            commented: updatedDoneData[existingIndex].commented ?? newEntry.commented,
+                            followed: updatedDoneData[existingIndex].followed ?? newEntry.followed
+                        };
+                    }
+                    else {
+                        // Add new entry
+                        updatedDoneData.push(newEntry);
+                    }
+                }
+                fs.writeFileSync(donePath, JSON.stringify(updatedDoneData, null, 2));
+                console.log(`[${run.id}] Updated done.json with ${updatedDoneData.length} done links (including ${linksToRemoveFromFailed.length} moved from failed)`);
+                // Update doneData for subsequent filtering
+                doneData = updatedDoneData;
             }
         }
+        // Update doneLinks array for filtering (after potential move from failed)
+        const doneLinksForFilter = doneData.map((item) => item.url);
         // Priority logic: Process 'links' first, only add 'failed' if no 'links' available
         const originalLinksCount = settings.links.length;
         const originalLinks = [...settings.links]; // Keep original links for API submission
         // Step 1: Filter out DONE links from the main 'links' array
-        settings.links = settings.links.filter((link) => !doneLinks.includes(link));
+        settings.links = settings.links.filter((link) => !doneLinksForFilter.includes(link));
         // Step 2: Submit API to update done/failed status BEFORE processing remaining links
-        if (doneLinks.length > 0 || failedLinks.length > 0) {
-            console.log(`[${run.id}] Submitting API to update done/failed status before processing...`);
-            console.log(`[${run.id}]   - Cache done links: ${doneLinks.length}`);
-            console.log(`[${run.id}]   - Cache failed links: ${failedLinks.length}`);
-            console.log(`[${run.id}]   - Original links to check: ${originalLinks.length}`);
+        if (doneLinksForFilter.length > 0 || failedLinks.length > 0) {
             try {
-                await (0, rawbot_1.submitCacheToAPI)(run.profile.id, // Profile ID for API
+                const result = await (0, rawbot_1.submitCacheToAPI)(run.profile.id, // Profile ID for API
                 run.profile.handle, // Profile handle for cache directory
                 run.id, // Run ID to filter by run
                 run.type === 'GROW' ? 'GROW' : 'COMMENT', // Run type based on run.type
                 { links: originalLinks } // Original links for reference
                 );
-                console.log(`[${run.id}] ✅ API submitted successfully via submitCacheToAPI`);
             }
             catch (error) {
                 console.error(`[${run.id}] Error submitting API after filtering:`, error);
-                // Continue processing even if API submission fails
             }
         }
         else {
             console.log(`[${run.id}] No done/failed links to submit to API`);
         }
-        console.log(`[${run.id}] Cache processing results:`);
-        console.log(`   - Done links: ${doneLinks.length} (filtered out)`);
-        console.log(`   - Failed links: ${failedLinks.length} (cleared and moved to done)`);
-        console.log(`   - Original links: ${originalLinksCount}`);
-        console.log(`   - Final links to process: ${settings.links.length}`);
-        console.log(`   - Status: ${settings.links.length === 0 ? 'All links processed - stopping run' : 'Processing remaining links'}`);
         return settings;
     }
     catch (error) {

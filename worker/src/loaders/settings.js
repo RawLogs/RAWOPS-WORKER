@@ -21,7 +21,6 @@ async function loadUserCommentSettings(profileId, userId, apiService) {
         console.log(`[Worker] ✅ Comment settings loaded from API for profile ${profileId}`);
         // Get Gemini API key if userId is provided and AI is enabled
         if (userId && userSettings.aiCommentEnabled && !userSettings.geminiApiKey) {
-            console.log(`[Worker] Fetching Gemini API key for AI comment generation...`);
             try {
                 const geminiApiKey = await (0, api_keys_1.getGeminiApiKey)(userId, apiService);
                 if (geminiApiKey) {
@@ -41,7 +40,6 @@ async function loadUserCommentSettings(profileId, userId, apiService) {
         }
         // Get prompt settings from database if AI is enabled
         if (userSettings.aiCommentEnabled) {
-            console.log(`[Worker] Fetching prompt settings from database (type: COMMENT)...`);
             try {
                 const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
                 if (!promptSettings) {

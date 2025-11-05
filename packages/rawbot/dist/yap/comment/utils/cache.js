@@ -128,12 +128,6 @@ async function saveToCache(cacheDir, type, link, data) {
         const filteredData = existingData.filter((item) => new Date(item.timestamp) > twoDaysAgo);
         // Write back to file
         fs.writeFileSync(filePath, JSON.stringify(filteredData, null, 2));
-        // Log the action (update or new entry)
-        const action = wasUpdate ? 'Updated' : 'Added';
-        const followStatus = entry.followed ? ' (followed)' : '';
-        const likeStatus = entry.liked ? ' (liked)' : '';
-        const commentStatus = entry.commented ? ' (commented)' : '';
-        console.log(`[YapComment] ${action} to ${type}.json: ${link}${likeStatus}${commentStatus}${followStatus}`);
     }
     catch (error) {
         console.error(`[YapComment] Error saving to ${type} cache:`, error);
@@ -155,12 +149,8 @@ async function getLatestLogTimestamp(sessionId, profileId) {
             const logs = await response.json();
             if (logs.length > 0) {
                 const latestTimestamp = new Date(logs[0].processedAt);
-                console.log(`[YapComment] Found latest log timestamp: ${latestTimestamp.toISOString()}`);
                 return latestTimestamp;
             }
-        }
-        else {
-            console.warn(`[YapComment] Failed to get latest log timestamp: ${response.status}`);
         }
         return null;
     }
@@ -185,11 +175,9 @@ async function checkExistingLogs(sessionId, profileId, links) {
         if (response.ok) {
             const existingLogs = await response.json();
             const existingLinksMap = new Map(existingLogs.map(log => [log.link, log.status]));
-            console.log(`[YapComment] Found ${existingLinksMap.size} existing logs for session ${sessionId}`);
             return existingLinksMap;
         }
         else {
-            console.warn(`[YapComment] Failed to check existing logs: ${response.status}`);
             return new Map();
         }
     }
@@ -201,7 +189,6 @@ async function checkExistingLogs(sessionId, profileId, links) {
 async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMMENT', processedSettings) {
     const serviceName = runType === 'GROW' ? 'YapGrow' : 'YapComment';
     try {
-        // Tự xử lý cacheDir từ profileHandle
         const cacheDir = path.join(process.cwd(), 'cache', `profile_${profileHandle}`);
         const donePath = path.join(cacheDir, 'done.json');
         const failedPath = path.join(cacheDir, 'failed.json');
@@ -220,14 +207,16 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
             failedLinks = runId ? failedData.filter((item) => item.runId === runId) : failedData;
         }
         if (doneLinks.length === 0 && failedLinks.length === 0) {
-            console.log(`[${serviceName}] No cache data to submit`);
-            return;
+            return {
+                success: true,
+                submitted: { done: 0, failed: 0 },
+                message: 'No cache data to submit'
+            };
         }
         // Create interaction session if runId is provided
         let sessionId = null;
         if (runId) {
             try {
-                console.log(`[${serviceName}] Creating interaction session for run: ${runId}`);
                 const sessionResponse = await fetch(`${getApiBaseUrl()}/interaction-sessions`, {
                     method: 'POST',
                     headers: {
@@ -245,10 +234,6 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
                 if (sessionResponse.ok) {
                     const sessionData = await sessionResponse.json();
                     sessionId = sessionData.id;
-                    console.log(`[${serviceName}] Created interaction session: ${sessionId}`);
-                }
-                else {
-                    console.error(`[${serviceName}] Failed to create interaction session: ${sessionResponse.status}`);
                 }
             }
             catch (error) {
@@ -261,11 +246,13 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
                 // Get all links from original input instead of cache
                 const originalInputLinks = processedSettings?.links || [];
                 if (originalInputLinks.length === 0) {
-                    console.log(`[${serviceName}] No original input links to check`);
-                    return;
+                    return {
+                        success: true,
+                        submitted: { done: 0, failed: 0 },
+                        message: 'No original input links to check'
+                    };
                 }
                 // Step 1: Get list of links that are NOT already in database with DONE status
-                console.log(`[${serviceName}] Checking pending links from ${originalInputLinks.length} total input links...`);
                 const pendingResponse = await fetch(`${getApiBaseUrl()}/interaction-logs/pending`, {
                     method: 'POST',
                     headers: {
@@ -279,48 +266,40 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
                     signal: AbortSignal.timeout(10000) // 10 second timeout
                 });
                 let pendingLinks = [];
-                let existingCount = 0;
-                let pendingCount = 0;
                 if (pendingResponse.ok) {
                     const pendingData = await pendingResponse.json();
                     pendingLinks = pendingData.pendingLinks;
-                    existingCount = pendingData.existingCount;
-                    pendingCount = pendingData.pendingCount;
-                    console.log(`[${serviceName}] ✅ Pending check: ${existingCount} existing in DB, ${pendingCount} pending`);
                 }
                 else {
-                    console.warn(`[${serviceName}] Failed to check pending links: ${pendingResponse.status}`);
                     // Fallback: use all cache links if API fails
                     pendingLinks = originalInputLinks;
-                    pendingCount = originalInputLinks.length;
                 }
                 if (pendingLinks.length === 0) {
-                    console.log(`[${serviceName}] No pending links found - all links already exist in database`);
-                    return;
+                    return {
+                        success: true,
+                        submitted: { done: 0, failed: 0 },
+                        message: 'No pending links found - all links already exist in database'
+                    };
                 }
                 // Step 2: Filter cache to only include links that:
                 // - Are in pendingLinks (not in DB or not DONE in DB)
                 // - AND have data in cache (done.json or failed.json)
-                console.log(`[${serviceName}] Filtering cache: ${doneLinks.length} done in cache, ${failedLinks.length} failed in cache`);
                 const pendingLinksSet = new Set(pendingLinks);
                 // Filter cache entries to only include links that are BOTH:
                 // 1. In pending list (need to be submitted)
                 // 2. In cache (already processed)
                 const filteredDoneLinks = doneLinks.filter((item) => pendingLinksSet.has(item.url));
                 const filteredFailedLinks = failedLinks.filter((item) => pendingLinksSet.has(item.url));
-                console.log(`[${serviceName}] 📊 Cache filtering results:`);
-                console.log(`   - Pending links from API: ${pendingLinks.length}`);
-                console.log(`   - Done links in cache matching pending: ${filteredDoneLinks.length}`);
-                console.log(`   - Failed links in cache matching pending: ${filteredFailedLinks.length}`);
-                console.log(`   - Total to submit: ${filteredDoneLinks.length + filteredFailedLinks.length}`);
                 // Step 3: Only submit if there are links that meet the criteria
                 if (filteredDoneLinks.length === 0 && filteredFailedLinks.length === 0) {
-                    console.log(`[${serviceName}] No cache entries match pending links - nothing to submit`);
-                    return;
+                    return {
+                        success: true,
+                        submitted: { done: 0, failed: 0 },
+                        message: 'No cache entries match pending links - nothing to submit'
+                    };
                 }
                 const newDoneLinks = filteredDoneLinks;
                 const newFailedLinks = filteredFailedLinks;
-                console.log(`[${serviceName}] 🚀 Submitting to interaction-logs API: ${newDoneLinks.length} done, ${newFailedLinks.length} failed`);
                 const logs = [
                     ...newDoneLinks.map((item) => ({
                         link: item.url,
@@ -362,12 +341,18 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
                     }),
                     signal: AbortSignal.timeout(10000) // 10 second timeout
                 });
+                let submittedDone = 0;
+                let submittedFailed = 0;
                 if (logsResponse.ok) {
                     const result = await logsResponse.json();
-                    console.log(`[${serviceName}] ✅ Interaction logs submitted: ${result.success} success, ${result.failed} failed`);
-                }
-                else {
-                    console.error(`[${serviceName}] Failed to submit interaction logs: ${logsResponse.status}`);
+                    submittedDone = result.success;
+                    submittedFailed = result.failed;
+                    // Return early if interaction logs API succeeded
+                    return {
+                        success: true,
+                        submitted: { done: submittedDone, failed: submittedFailed },
+                        message: `Successfully submitted ${submittedDone} done and ${submittedFailed} failed links to interaction logs API`
+                    };
                 }
             }
             catch (error) {
@@ -394,14 +379,32 @@ async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMM
             }), processedSettings?.links, // Pass original input links for filtering
             runType // Pass runType to choose correct API endpoint
             );
-            console.log(`[${serviceName}] ✅ Legacy API fallback completed`);
+            // Return result from legacy API fallback
+            return {
+                success: true,
+                submitted: {
+                    done: currentRunDoneLinks.length,
+                    failed: currentRunFailedLinks.length
+                },
+                message: `Submitted ${currentRunDoneLinks.length} done and ${currentRunFailedLinks.length} failed links via legacy API fallback`
+            };
         }
         catch (apiError) {
             console.error(`[${serviceName}] Fallback legacy API call failed:`, apiError);
+            return {
+                success: false,
+                submitted: { done: 0, failed: 0 },
+                message: `Legacy API fallback failed: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`
+            };
         }
     }
     catch (error) {
         console.error(`[${serviceName}] Error submitting cache to API:`, error);
+        return {
+            success: false,
+            submitted: { done: 0, failed: 0 },
+            message: `Error submitting cache to API: ${error instanceof Error ? error.message : 'Unknown error'}`
+        };
     }
 }
 /**
@@ -492,7 +495,7 @@ async function saveLinkStatusToAPI(profileId, link, status, details) {
  */
 async function submitSingleLinkToInteractionLogs(profileId, link, status, details, runType = 'COMMENT' // 'COMMENT', 'GROW', 'CBP', 'CBL'
 ) {
-    const maxRetries = 3;
+    const maxRetries = 5;
     const retryDelay = 1000; // 1 second
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -652,7 +655,6 @@ async function updateRemainingLinksAPI(profileId, remainingLinks) {
     const retryDelay = 1000; // 1 second
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`[YapComment] Updating API with ${remainingLinks.length} remaining links... (attempt ${attempt}/${maxRetries})`);
             const response = await fetch(`${getApiBaseUrl()}/profile/comment-config`, {
                 method: 'POST',
                 headers: {
@@ -667,14 +669,7 @@ async function updateRemainingLinksAPI(profileId, remainingLinks) {
                 signal: AbortSignal.timeout(10000) // 10 second timeout
             });
             if (response.ok) {
-                console.log('[YapComment] API updated with remaining links successfully');
                 return; // Success, exit the retry loop
-            }
-            else {
-                console.error(`[YapComment] Failed to update API: ${response.status}`);
-                if (attempt === maxRetries) {
-                    console.error(`[YapComment] Max retries reached for updating remaining links`);
-                }
             }
         }
         catch (error) {
@@ -683,7 +678,6 @@ async function updateRemainingLinksAPI(profileId, remainingLinks) {
                 error.code === 'ENOTFOUND' ||
                 error.message?.includes('fetch failed');
             if (isNetworkError && attempt < maxRetries) {
-                console.log(`[YapComment] Network error on attempt ${attempt}, retrying in ${retryDelay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 continue;
             }
@@ -705,7 +699,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
     const serviceName = runType === 'GROW' ? 'YapGrow' : 'YapComment';
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`[${serviceName}] Bulk updating API: ${doneLinks.length} done, ${failedLinks.length} failed (attempt ${attempt}/${maxRetries})`);
             // Get cache data from local profile cache files
             const cacheDir = path.join(process.cwd(), 'cache', `profile_${profileHandle}`);
             const donePath = path.join(cacheDir, 'done.json');
@@ -718,7 +711,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 try {
                     const doneData = JSON.parse(fs.readFileSync(donePath, 'utf8'));
                     currentDone = doneData.map((item) => item.url);
-                    console.log(`[${serviceName}] Found ${currentDone.length} done links in local cache`);
                 }
                 catch (error) {
                     console.error(`[${serviceName}] Error reading done.json:`, error);
@@ -729,7 +721,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 try {
                     const failedData = JSON.parse(fs.readFileSync(failedPath, 'utf8'));
                     currentFailed = failedData.map((item) => item.url);
-                    console.log(`[${serviceName}] Found ${currentFailed.length} failed links in local cache`);
                 }
                 catch (error) {
                     console.error(`[${serviceName}] Error reading failed.json:`, error);
@@ -760,11 +751,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 const remainingFailedLinks = remainingLinks.map(link => `${link} (Not processed)`);
                 finalDoneLinks = filteredDoneLinks;
                 finalFailedLinks = [...filteredFailedLinks, ...remainingFailedLinks];
-                console.log(`[${serviceName}] Link accounting for original input (${originalLinks.length} total):`);
-                console.log(`   - Done links: ${finalDoneLinks.length}`);
-                console.log(`   - Failed links: ${finalFailedLinks.length}`);
-                console.log(`   - Remaining unprocessed: ${remainingLinks.length}`);
-                console.log(`   - Total accounted: ${finalDoneLinks.length + finalFailedLinks.length}`);
                 // Verify total matches original
                 const totalAccounted = finalDoneLinks.length + finalFailedLinks.length;
                 if (totalAccounted !== originalLinks.length) {
@@ -776,7 +762,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
             let finalDoneToSubmit = [];
             let finalFailedToSubmit = [];
             if (originalLinks && originalLinks.length > 0) {
-                console.log(`[${serviceName}] Checking ${originalLinks.length} original links against cache...`);
                 // Check each original link against local cache
                 for (const originalLink of originalLinks) {
                     // Check if link is in done cache (from local cache)
@@ -788,7 +773,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                     });
                     if (isInDone) {
                         finalDoneToSubmit.push(originalLink);
-                        console.log(`[${serviceName}] ✅ ${originalLink} - Found in done cache`);
                     }
                     else if (isInFailed) {
                         // Find the failed entry with reason from local cache
@@ -797,24 +781,17 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                             return baseUrl === originalLink;
                         });
                         finalFailedToSubmit.push(failedEntry || originalLink);
-                        console.log(`[${serviceName}] ❌ ${originalLink} - Found in failed cache`);
                     }
                     else {
                         // Link not processed yet, add to links
                         finalLinksToSubmit.push(originalLink);
-                        console.log(`[${serviceName}] ⏳ ${originalLink} - Not processed yet`);
                     }
                 }
-                console.log(`[${serviceName}] Cache check results for ${originalLinks.length} original links:`);
-                console.log(`   - Links (not processed): ${finalLinksToSubmit.length} (not submitted)`);
-                console.log(`   - Done: ${finalDoneToSubmit.length}`);
-                console.log(`   - Failed: ${finalFailedToSubmit.length}`);
             }
             else {
                 // Fallback: submit all data if no original links provided
                 finalDoneToSubmit = [...currentDone];
                 finalFailedToSubmit = [...currentFailed];
-                console.log(`[${serviceName}] No original links provided, submitting all local cache data (done/failed only)`);
             }
             // Choose API endpoint and prepare body based on runType
             let apiEndpoint;
@@ -878,19 +855,7 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 signal: AbortSignal.timeout(10000) // 10 second timeout
             });
             if (response.ok) {
-                console.log(`[${serviceName}] ✅ Bulk update successful: ${finalDoneToSubmit.length} done, ${finalFailedToSubmit.length} failed`);
-                console.log(`[${serviceName}] 📊 API submission summary:`);
-                console.log(`   - Total original links: ${originalLinks?.length || 0}`);
-                console.log(`   - Done links submitted: ${finalDoneToSubmit.length}`);
-                console.log(`   - Failed links submitted: ${finalFailedToSubmit.length}`);
-                console.log(`   - Links not processed: ${finalLinksToSubmit.length}`);
                 return; // Success, exit the retry loop
-            }
-            else {
-                console.error(`[${serviceName}] Failed bulk update: ${response.status}`);
-                if (attempt === maxRetries) {
-                    console.error(`[${serviceName}] Max retries reached for bulk update`);
-                }
             }
         }
         catch (error) {
@@ -899,7 +864,6 @@ doneLinks, failedLinks, originalLinks, runType = 'COMMENT' // 'COMMENT' or 'GROW
                 error.code === 'ENOTFOUND' ||
                 error.message?.includes('fetch failed');
             if (isNetworkError && attempt < maxRetries) {
-                console.log(`[${serviceName}] Network error on attempt ${attempt}, retrying in ${retryDelay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 continue;
             }
@@ -919,7 +883,6 @@ async function enhanceErrorDetails(driver, failedLinks) {
             const currentError = link.error || link.reason;
             if (currentError === 'Unknown error' || currentError?.toLowerCase().includes('unknown')) {
                 try {
-                    console.log(`[YapComment] Enhancing error details for: ${link.url}`);
                     // Navigate to the failed link
                     await driver.get(link.url);
                     await driver.sleep(2000); // Wait for page to load
@@ -927,7 +890,6 @@ async function enhanceErrorDetails(driver, failedLinks) {
                     const errorDriver = new rawops_1.ErrorDriver(driver);
                     const errorDetail = await errorDriver.extractErrorDetails();
                     if (errorDetail) {
-                        console.log(`[YapComment] Found error details: ${errorDetail.type} - ${errorDetail.message}`);
                         // Update the link with enhanced error details
                         enhancedLinks.push({
                             ...link,
@@ -983,12 +945,6 @@ async function filterProcessedLinks(cacheDir, links) {
         // Filter out processed links
         const processedLinks = [...doneLinks];
         const filteredLinks = links.filter(link => !processedLinks.includes(link));
-        console.log(`[YapComment] Cache status:`);
-        console.log(`   - Done links: ${doneLinks.length}`);
-        console.log(`   - Failed links: ${failedLinks.length}`);
-        console.log(`   - Total processed: ${processedLinks.length}`);
-        console.log(`   - Original links: ${links.length}`);
-        console.log(`   - Filtered links: ${filteredLinks.length}`);
         return filteredLinks;
     }
     catch (error) {

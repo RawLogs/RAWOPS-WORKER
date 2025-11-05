@@ -18,7 +18,14 @@ export declare function getLatestLogTimestamp(sessionId: string, profileId: stri
 export declare function checkExistingLogs(sessionId: string, profileId: string, links: string[]): Promise<Map<string, string>>;
 export declare function submitCacheToAPI(profileId: string, profileHandle: string, runId?: string, runType?: string, processedSettings?: {
     links: string[];
-}): Promise<void>;
+}): Promise<{
+    success: boolean;
+    submitted: {
+        done: number;
+        failed: number;
+    };
+    message: string;
+}>;
 /**
  * Save individual link status to profile/comment-config API
  */
