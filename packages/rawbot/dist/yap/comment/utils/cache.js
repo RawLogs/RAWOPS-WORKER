@@ -198,9 +198,11 @@ async function checkExistingLogs(sessionId, profileId, links) {
         return new Map();
     }
 }
-async function submitCacheToAPI(cacheDir, profileId, runId, runType = 'COMMENT', processedSettings) {
+async function submitCacheToAPI(profileId, profileHandle, runId, runType = 'COMMENT', processedSettings) {
     const serviceName = runType === 'GROW' ? 'YapGrow' : 'YapComment';
     try {
+        // Tự xử lý cacheDir từ profileHandle
+        const cacheDir = path.join(process.cwd(), 'cache', `profile_${profileHandle}`);
         const donePath = path.join(cacheDir, 'done.json');
         const failedPath = path.join(cacheDir, 'failed.json');
         let doneLinks = [];

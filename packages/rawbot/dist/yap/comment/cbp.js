@@ -745,7 +745,7 @@ class CommentByProfile {
         // Set closed flag first
         this.isClosed = true;
         // Submit cache before closing
-        await (0, utils_1.submitCacheToAPI)(this.cacheDir, this.profileId, this.runId, this.runType, this.processedSettings);
+        await (0, utils_1.submitCacheToAPI)(this.profileId, this.profileHandle, this.runId, this.runType, this.processedSettings);
         if (this.xClient) {
             await this.xClient.close();
         }

@@ -18,7 +18,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calculateFollowRatio = exports.Drivers = exports.setupBrowser = exports.RawOps = exports.bulkUpdateLinksStatusAPI = exports.YapGrow = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
+exports.calculateFollowRatio = exports.Drivers = exports.setupBrowser = exports.RawOps = exports.submitCacheToAPI = exports.bulkUpdateLinksStatusAPI = exports.YapGrow = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
 // Core services exports
 var XClient_1 = require("./client/XClient");
 Object.defineProperty(exports, "XClient", { enumerable: true, get: function () { return XClient_1.XClient; } });
@@ -47,6 +47,7 @@ Object.defineProperty(exports, "YapGrow", { enumerable: true, get: function () {
 // Cache utilities exports
 var cache_1 = require("./yap/comment/utils/cache");
 Object.defineProperty(exports, "bulkUpdateLinksStatusAPI", { enumerable: true, get: function () { return cache_1.bulkUpdateLinksStatusAPI; } });
+Object.defineProperty(exports, "submitCacheToAPI", { enumerable: true, get: function () { return cache_1.submitCacheToAPI; } });
 // Re-export rawops for convenience
 var rawops_1 = require("@rawops/rawops");
 Object.defineProperty(exports, "RawOps", { enumerable: true, get: function () { return rawops_1.RawOps; } });

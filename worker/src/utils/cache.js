@@ -122,13 +122,13 @@ async function processCacheForRun(run, settings) {
             console.log(`[${run.id}]   - Cache failed links: ${failedLinks.length}`);
             console.log(`[${run.id}]   - Original links to check: ${originalLinks.length}`);
             try {
-                await (0, rawbot_1.bulkUpdateLinksStatusAPI)(run.profile.id, // Profile ID for API
+                await (0, rawbot_1.submitCacheToAPI)(run.profile.id, // Profile ID for API
                 run.profile.handle, // Profile handle for cache directory
-                [], // Don't pass doneLinks here - function will read from cache
-                [], // Don't pass failedLinks here - function will read from cache
-                originalLinks // Original links for reference
+                run.id, // Run ID to filter by run
+                run.type === 'GROW' ? 'GROW' : 'COMMENT', // Run type based on run.type
+                { links: originalLinks } // Original links for reference
                 );
-                console.log(`[${run.id}] ✅ API submitted successfully - function will determine actual counts from cache`);
+                console.log(`[${run.id}] ✅ API submitted successfully via submitCacheToAPI`);
             }
             catch (error) {
                 console.error(`[${run.id}] Error submitting API after filtering:`, error);
@@ -137,41 +137,6 @@ async function processCacheForRun(run, settings) {
         }
         else {
             console.log(`[${run.id}] No done/failed links to submit to API`);
-        }
-        // Step 3: Handle case when no links are available to process
-        if (settings.links.length === 0) {
-            if (failedLinks.length > 0) {
-                console.log(`[${run.id}] No links available, submitting all original links as DONE`);
-                // Clear failed cache locally
-                const failedPath = path.join(cacheDir, 'failed.json');
-                if (fs.existsSync(failedPath)) {
-                    fs.writeFileSync(failedPath, JSON.stringify([], null, 2));
-                    console.log(`[${run.id}] Cleared local failed cache`);
-                }
-                // Submit all original links as DONE since all processing is complete
-                try {
-                    await (0, rawbot_1.bulkUpdateLinksStatusAPI)(run.profile.id, // Profile ID for API
-                    run.profile.handle, // Profile handle for cache directory
-                    [], // Don't pass doneLinks here - function will read from cache
-                    [], // Don't pass failedLinks here - function will read from cache
-                    originalLinks // Original links for reference
-                    );
-                    console.log(`[${run.id}] ✅ Submitted all ${originalLinks.length} original links as DONE`);
-                }
-                catch (error) {
-                    console.error(`[${run.id}] Error clearing failed links via API:`, error);
-                }
-                // Set links to empty to stop processing
-                settings.links = [];
-                console.log(`[${run.id}] All links processed, stopping run with success`);
-            }
-            else {
-                console.log(`[${run.id}] No links available and no failed links to retry`);
-                settings.links = [];
-            }
-        }
-        else {
-            console.log(`[${run.id}] Processing ${settings.links.length} links from main queue (skipping failed links)`);
         }
         console.log(`[${run.id}] Cache processing results:`);
         console.log(`   - Done links: ${doneLinks.length} (filtered out)`);

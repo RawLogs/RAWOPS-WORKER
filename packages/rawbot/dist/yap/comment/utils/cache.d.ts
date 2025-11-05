@@ -16,7 +16,7 @@ export declare function getLatestLogTimestamp(sessionId: string, profileId: stri
  * Returns a Map with link -> status for better filtering logic
  */
 export declare function checkExistingLogs(sessionId: string, profileId: string, links: string[]): Promise<Map<string, string>>;
-export declare function submitCacheToAPI(cacheDir: string, profileId: string, runId?: string, runType?: string, processedSettings?: {
+export declare function submitCacheToAPI(profileId: string, profileHandle: string, runId?: string, runType?: string, processedSettings?: {
     links: string[];
 }): Promise<void>;
 /**
