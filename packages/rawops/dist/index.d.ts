@@ -14,7 +14,7 @@ import { FollowerDiscoveryOps } from './discovery';
 import { GrowOps } from './grow';
 import { ErrorDriver } from './error-driver';
 import { AntiDetectionIntegration, createAntiDetection, quickScrollWithMouse, quickClickWithMouse, simulateBrowsingSession, BEHAVIORAL_PATTERNS } from './anti-detection';
-import { setupBrowser, randomDelay, parseProxyString } from './selenium-utils';
+import { setupBrowser, randomDelay, parseProxyString, saveWindowSize, quitDriver } from './selenium-utils';
 import { smoothRandomScroll } from './scroll';
 import type { ProxyConfig } from './selenium-utils';
 import { detectIPLocation, generateSynchronizedConfig, generateUserAgent, getActualScreenResolution, POPULAR_USER_AGENTS, DEFAULT_USER_AGENT } from './config/userAgentConfig';
@@ -23,7 +23,7 @@ export { BaseOps, LikeOps, PostOps, CommentOps, SearchOps, ScrollOps, WaitOps, E
 export { extractErrorDetails, hasPageError } from './error-driver';
 export { calculateFollowRatio } from './profile';
 export { AntiDetectionIntegration, createAntiDetection, quickScrollWithMouse, quickClickWithMouse, simulateBrowsingSession, BEHAVIORAL_PATTERNS };
-export { setupBrowser, randomDelay, parseProxyString };
+export { setupBrowser, randomDelay, parseProxyString, saveWindowSize, quitDriver };
 export { smoothRandomScroll };
 export type { ProxyConfig };
 export { detectIPLocation, generateSynchronizedConfig, generateUserAgent, getActualScreenResolution, POPULAR_USER_AGENTS, DEFAULT_USER_AGENT };

@@ -11,6 +11,7 @@ class XClient {
     constructor() {
         this.driver = null;
         this.isInitialized = false;
+        this.profileHandle = null;
         // No initialization needed here
     }
     /**
@@ -19,6 +20,8 @@ class XClient {
     async initialize(profileHandle, proxyConfig, mode) {
         try {
             console.log(`[XClient] Initializing with profile: ${profileHandle}, mode: ${mode}`);
+            // Store profile handle for later use
+            this.profileHandle = profileHandle;
             // Setup browser using RawOps directly
             const launchMode = mode === 'runProfile' ? 'runProfile' : 'selenium';
             this.driver = await (0, rawops_1.setupBrowser)(profileHandle, proxyConfig, launchMode);
@@ -76,14 +79,38 @@ class XClient {
     async close() {
         try {
             if (this.driver) {
-                await this.driver.quit();
-                console.log("[XClient] Browser closed");
+                // Always try to save window size and position before quitting
+                // Pass profileHandle to ensure it can be saved even if extraction fails
+                await (0, rawops_1.quitDriver)(this.driver, this.profileHandle || undefined);
+                console.log("[XClient] Browser closed and window size/position saved");
             }
             this.driver = null;
             this.isInitialized = false;
+            this.profileHandle = null;
         }
         catch (error) {
             console.error("[XClient] Error closing client:", error);
+            // Even if there's an error, try to save window size/position if driver still exists
+            if (this.driver) {
+                try {
+                    // saveWindowSize now saves both size and position
+                    await (0, rawops_1.saveWindowSize)(this.driver, this.profileHandle || undefined);
+                    console.log("[XClient] Window size/position saved after error");
+                }
+                catch (saveError) {
+                    console.error("[XClient] Failed to save window size/position:", saveError);
+                }
+                // Try to quit driver even if save failed
+                try {
+                    await this.driver.quit();
+                }
+                catch (quitError) {
+                    console.error("[XClient] Failed to quit driver:", quitError);
+                }
+            }
+            this.driver = null;
+            this.isInitialized = false;
+            this.profileHandle = null;
         }
     }
     /**

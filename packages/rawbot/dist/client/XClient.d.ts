@@ -3,6 +3,7 @@ import { ProxyConfig } from '@rawops/rawops';
 export declare class XClient {
     private driver;
     private isInitialized;
+    private profileHandle;
     constructor();
     /**
      * Initialize the client with profile and proxy configuration

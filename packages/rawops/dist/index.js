@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.GrowOps = exports.FollowerDiscoveryOps = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
+exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.quitDriver = exports.saveWindowSize = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.GrowOps = exports.FollowerDiscoveryOps = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
 // Import all operation classes
 const base_1 = require("./base");
 Object.defineProperty(exports, "BaseOps", { enumerable: true, get: function () { return base_1.BaseOps; } });
@@ -43,6 +43,8 @@ const selenium_utils_1 = require("./selenium-utils");
 Object.defineProperty(exports, "setupBrowser", { enumerable: true, get: function () { return selenium_utils_1.setupBrowser; } });
 Object.defineProperty(exports, "randomDelay", { enumerable: true, get: function () { return selenium_utils_1.randomDelay; } });
 Object.defineProperty(exports, "parseProxyString", { enumerable: true, get: function () { return selenium_utils_1.parseProxyString; } });
+Object.defineProperty(exports, "saveWindowSize", { enumerable: true, get: function () { return selenium_utils_1.saveWindowSize; } });
+Object.defineProperty(exports, "quitDriver", { enumerable: true, get: function () { return selenium_utils_1.quitDriver; } });
 const scroll_2 = require("./scroll");
 Object.defineProperty(exports, "smoothRandomScroll", { enumerable: true, get: function () { return scroll_2.smoothRandomScroll; } });
 // Import user agent and fingerprinting
@@ -136,7 +138,8 @@ class RawOps {
      * Close the browser
      */
     async close() {
-        await this.driver.quit();
+        // quitDriver will automatically save window size before quitting
+        await (0, selenium_utils_1.quitDriver)(this.driver);
     }
 }
 exports.RawOps = RawOps;

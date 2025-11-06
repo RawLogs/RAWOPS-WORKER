@@ -36,8 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getChromeBinaryPath = void 0;
+exports.quitDriver = quitDriver;
+exports.saveWindowSizeAndPosition = saveWindowSizeAndPosition;
+exports.saveWindowSize = saveWindowSize;
 exports.cleanupProxyServers = cleanupProxyServers;
-exports.getChromeBinaryPath = getChromeBinaryPath;
 exports.setupBrowser = setupBrowser;
 const selenium_webdriver_1 = require("selenium-webdriver");
 const chrome_1 = __importDefault(require("selenium-webdriver/chrome"));
@@ -46,6 +49,8 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const ProxyChain = require('proxy-chain');
 const net = __importStar(require("net"));
+const pathConfig_1 = require("../config/pathConfig");
+Object.defineProperty(exports, "getChromeBinaryPath", { enumerable: true, get: function () { return pathConfig_1.getChromeBinaryPath; } });
 // Logging function
 function log(profile, message, color = chalk_1.default.white) {
     const timestamp = new Date().toISOString();
@@ -53,6 +58,160 @@ function log(profile, message, color = chalk_1.default.white) {
 }
 // Store active proxy servers for cleanup
 const activeProxyServers = new Set();
+/**
+ * Get profile config file path (for backward compatibility)
+ */
+function getProfileConfigPath(profilePath) {
+    return path.join(profilePath, 'profile-config.json');
+}
+/**
+ * Load profile config from file
+ */
+function loadProfileConfig(profilePath) {
+    const configPath = getProfileConfigPath(profilePath);
+    if (!fs.existsSync(configPath)) {
+        return null;
+    }
+    try {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        return JSON.parse(configContent);
+    }
+    catch (error) {
+        log(path.basename(profilePath), `Failed to load profile config: ${error}`, chalk_1.default.yellow);
+        return null;
+    }
+}
+/**
+ * Load window size from profile config
+ */
+function loadWindowSize(profilePath) {
+    const config = loadProfileConfig(profilePath);
+    if (config && config.windowSize && config.windowSize.width && config.windowSize.height) {
+        return {
+            width: config.windowSize.width,
+            height: config.windowSize.height
+        };
+    }
+    return null;
+}
+/**
+ * Load window position from profile config
+ */
+function loadWindowPosition(profilePath) {
+    const config = loadProfileConfig(profilePath);
+    if (config && config.windowPosition && typeof config.windowPosition.x === 'number' && typeof config.windowPosition.y === 'number') {
+        return {
+            x: config.windowPosition.x,
+            y: config.windowPosition.y
+        };
+    }
+    return null;
+}
+/**
+ * Get profile name from driver's user-data-dir
+ */
+async function getProfileFromDriver(driver) {
+    try {
+        const capabilities = await driver.getCapabilities();
+        const chromeOptions = capabilities.get('goog:chromeOptions');
+        if (chromeOptions && chromeOptions.args) {
+            const args = chromeOptions.args;
+            const userDataDirArg = args.find(arg => arg.startsWith('--user-data-dir='));
+            if (userDataDirArg) {
+                const userDataDir = userDataDirArg.split('=')[1];
+                const baseProfilePath = (0, pathConfig_1.getProfilesBasePath)();
+                // Extract profile name from path
+                if (userDataDir.startsWith(baseProfilePath)) {
+                    const relativePath = path.relative(baseProfilePath, userDataDir);
+                    const profileName = relativePath.split(path.sep)[0];
+                    return profileName || null;
+                }
+            }
+        }
+    }
+    catch (error) {
+        // Silently fail - profile name extraction is optional
+    }
+    return null;
+}
+/**
+ * Quit driver and save window size and position before closing
+ * This ensures the final window size and position are always saved to profile config
+ */
+async function quitDriver(driver, profile) {
+    try {
+        // Save window size and position before quitting
+        await saveWindowSizeAndPosition(driver, profile);
+    }
+    catch (error) {
+        const profileName = profile || 'unknown';
+        log(profileName, `Failed to save window size/position before quit: ${error}`, chalk_1.default.yellow);
+        // Continue with quit even if save fails
+    }
+    // Quit the driver
+    await driver.quit();
+}
+/**
+ * Save window size and position to profile config
+ * If profile is not provided, it will try to extract it from the driver
+ */
+async function saveWindowSizeAndPosition(driver, profile) {
+    try {
+        // Get profile name if not provided
+        let profileName = profile;
+        if (!profileName) {
+            profileName = await getProfileFromDriver(driver);
+            if (!profileName) {
+                log('unknown', 'Could not determine profile name, skipping window size/position save', chalk_1.default.yellow);
+                return;
+            }
+        }
+        const configPath = (0, pathConfig_1.getProfileConfigFilePath)(profileName);
+        const profilePath = (0, pathConfig_1.getProfilePath)(profileName);
+        // Ensure profile directory exists
+        if (!fs.existsSync(profilePath)) {
+            fs.mkdirSync(profilePath, { recursive: true });
+            log(profileName, `Created profile directory: ${profilePath}`);
+        }
+        // Get current window size and position from driver
+        const window = driver.manage().window();
+        const rect = await window.getRect();
+        // Load existing config or create new one
+        let config = {};
+        if (fs.existsSync(configPath)) {
+            try {
+                const configContent = fs.readFileSync(configPath, 'utf8');
+                config = JSON.parse(configContent);
+            }
+            catch (error) {
+                log(profileName, `Failed to read existing config, creating new one: ${error}`, chalk_1.default.yellow);
+            }
+        }
+        // Update window size and position
+        config.windowSize = {
+            width: rect.width,
+            height: rect.height
+        };
+        config.windowPosition = {
+            x: rect.x,
+            y: rect.y
+        };
+        // Save config
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+        log(profileName, `Saved window size: ${rect.width}x${rect.height}, position: ${rect.x},${rect.y}`, chalk_1.default.green);
+    }
+    catch (error) {
+        const profileName = profile || 'unknown';
+        log(profileName, `Failed to save window size/position: ${error}`, chalk_1.default.red);
+    }
+}
+/**
+ * Save window size to profile config (backward compatibility)
+ * If profile is not provided, it will try to extract it from the driver
+ */
+async function saveWindowSize(driver, profile) {
+    await saveWindowSizeAndPosition(driver, profile);
+}
 /**
  * Test proxy connection
  */
@@ -142,53 +301,35 @@ async function createAuthenticatedProxy(proxyConfig, profile) {
         }
     }
 }
-/*
- * Get Chrome binary path
- */
-function getChromeBinaryPath() {
-    // Chrome is located outside the project root
-    const projectRoot = path.join(__dirname, '..', '..', '..', '..');
-    switch (process.platform) {
-        case 'darwin': // macOS
-            // Check common Chrome locations on Mac
-            const macPaths = [
-                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                path.join(projectRoot, 'chromium', 'chrome'),
-                path.join(process.env.HOME || '', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-            ];
-            for (const path of macPaths) {
-                if (fs.existsSync(path)) {
-                    return path;
-                }
-            }
-            throw new Error('Chrome browser not found. Please install Google Chrome.');
-        case 'win32': // Windows
-            return path.join(projectRoot, 'chromium', 'chrome.exe');
-        default: // Linux and others
-            return path.join(projectRoot, 'chromium', 'chrome');
-    }
-}
 /**
  * Setup browser with profile and proxy configuration
  */
 async function setupBrowser(profile, proxyConfig, mode = 'selenium') {
-    // Profiles are located outside the project root
-    const projectRoot = path.join(__dirname, '..', '..', '..', '..');
-    const baseProfilePath = path.join(projectRoot, 'profiles');
-    const profilePath = path.join(baseProfilePath, profile);
+    // Get profile path using path config
+    const profilePath = (0, pathConfig_1.getProfilePath)(profile);
     log(profile, "Setting up browser...");
     if (!fs.existsSync(profilePath)) {
         fs.mkdirSync(profilePath, { recursive: true });
         log(profile, `Created profile directory: ${profilePath}`);
     }
     if (mode === 'runProfile') {
+        // Load saved window size or use HD default (1920x1080)
+        const savedSize = loadWindowSize(profilePath);
+        let windowWidth = savedSize?.width || 1920;
+        let windowHeight = savedSize?.height || 1080;
+        if (savedSize) {
+            log(profile, `Loaded saved window size: ${windowWidth}x${windowHeight}`, chalk_1.default.green);
+        }
+        else {
+            log(profile, `Using default HD window size: ${windowWidth}x${windowHeight}`, chalk_1.default.cyan);
+        }
         const args = [
             `--user-data-dir=${profilePath}`,
             '--no-first-run',
             '--no-default-browser-check',
             '--lang=en-US',
             '--start-maximized',
-            '--window-size=1280,900',
+            `--window-size=${windowWidth},${windowHeight}`,
             'https://x.com/'
         ];
         if (proxyConfig && proxyConfig.host && proxyConfig.port) {
@@ -204,14 +345,24 @@ async function setupBrowser(profile, proxyConfig, mode = 'selenium') {
                 args.push('--proxy-bypass-list=<-loopback>');
             }
         }
-        const chromePath = getChromeBinaryPath();
+        const chromePath = (0, pathConfig_1.getChromeBinaryPath)();
         const { spawn } = require('child_process');
         spawn(chromePath, args, { stdio: 'ignore', detached: true }).unref();
         log(profile, "Launched Chrome (manual login mode)");
         return null;
     }
-    const windowWidth = 650;
-    const windowHeight = 900;
+    // Load saved window size or use HD default (1920x1080)
+    const savedSize = loadWindowSize(profilePath);
+    let windowWidth = savedSize?.width || 1920;
+    let windowHeight = savedSize?.height || 1080;
+    if (savedSize) {
+        log(profile, `Loaded saved window size: ${windowWidth}x${windowHeight}`, chalk_1.default.green);
+    }
+    else {
+        log(profile, `Using default HD window size: ${windowWidth}x${windowHeight}`, chalk_1.default.cyan);
+    }
+    // Load saved window position
+    const savedPosition = loadWindowPosition(profilePath);
     const options = new chrome_1.default.Options();
     if (proxyConfig && proxyConfig.host && proxyConfig.port) {
         // Test proxy connection first
@@ -229,17 +380,42 @@ async function setupBrowser(profile, proxyConfig, mode = 'selenium') {
     }
     options.addArguments(`--user-data-dir=${profilePath}`, '--disable-blink-features=AutomationControlled', `--window-size=${windowWidth},${windowHeight}`, '--no-first-run', '--no-default-browser-check', '--disable-component-update', '--disable-sync', '--lang=en-US');
     options.excludeSwitches('enable-automation');
-    const isWindows = process.platform === 'win32';
-    const chromedriverPath = isWindows
-        ? path.join(projectRoot, 'chromium', 'chromedriver.exe')
-        : path.join(projectRoot, 'chromium', 'chromedriver');
-    const chromeBinaryPath = getChromeBinaryPath();
+    // Get Chrome and ChromeDriver paths using path config
+    const chromedriverPath = (0, pathConfig_1.getChromeDriverPath)();
+    const chromeBinaryPath = (0, pathConfig_1.getChromeBinaryPath)();
     options.setChromeBinaryPath(chromeBinaryPath);
     const driver = await new selenium_webdriver_1.Builder()
         .forBrowser('chrome')
         .setChromeOptions(options)
         .setChromeService(new chrome_1.default.ServiceBuilder(chromedriverPath))
         .build();
+    // Ensure window size and position are set correctly and save to profile config
+    try {
+        const window = driver.manage().window();
+        // Set window size and position using setRect
+        if (savedPosition) {
+            await window.setRect({
+                width: windowWidth,
+                height: windowHeight,
+                x: savedPosition.x,
+                y: savedPosition.y
+            });
+            log(profile, `Restored window size: ${windowWidth}x${windowHeight}, position: ${savedPosition.x},${savedPosition.y}`, chalk_1.default.green);
+        }
+        else {
+            await window.setRect({
+                width: windowWidth,
+                height: windowHeight,
+                x: 0,
+                y: 0
+            });
+        }
+        // Save initial window size and position
+        await saveWindowSizeAndPosition(driver, profile);
+    }
+    catch (error) {
+        log(profile, `Failed to set/save window size/position: ${error}`, chalk_1.default.yellow);
+    }
     log(profile, "Browser setup completed successfully.");
     return driver;
 }

@@ -298,18 +298,79 @@ function getActualScreenResolution() {
     try {
         const platform = os.platform();
         if (platform === 'win32') {
-            // Windows: Use PowerShell to get screen resolution
-            const command = 'powershell "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen.Bounds"';
-            const result = (0, child_process_1.execSync)(command, { encoding: 'utf8' }).trim();
-            // Parse result like: Width=1920 Height=1080 X=0 Y=0
-            const widthMatch = result.match(/Width=(\d+)/);
-            const heightMatch = result.match(/Height=(\d+)/);
-            if (widthMatch && heightMatch) {
-                return {
-                    width: parseInt(widthMatch[1]),
-                    height: parseInt(heightMatch[1])
-                };
+            // Windows: Try multiple methods to get screen resolution
+            // Method 1: Use PowerShell with System.Windows.Forms.Screen (Primary Screen)
+            try {
+                const command1 = 'powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $screen = [System.Windows.Forms.Screen]::PrimaryScreen; Write-Host ($screen.Bounds.Width.ToString() + \'x\' + $screen.Bounds.Height.ToString())"';
+                const result1 = (0, child_process_1.execSync)(command1, { encoding: 'utf8', timeout: 5000 }).trim();
+                // Parse result like: 3840x2160
+                const match1 = result1.match(/(\d+)x(\d+)/);
+                if (match1) {
+                    const width = parseInt(match1[1]);
+                    const height = parseInt(match1[2]);
+                    // Validate: reasonable screen resolution (at least 800x600)
+                    if (width >= 800 && height >= 600) {
+                        console.log(`Detected screen resolution (Primary Screen): ${width}x${height}`);
+                        return { width, height };
+                    }
+                }
             }
+            catch (error) {
+                console.log(`Method 1 failed: ${error.message}`);
+            }
+            // Method 2: Use PowerShell with WMI to get all screens and find the largest
+            try {
+                const command2 = 'powershell -Command "$screens = Get-WmiObject -Namespace root\\wmi -Class WmiMonitorBasicDisplayParams; $maxWidth = 0; $maxHeight = 0; foreach ($screen in $screens) { if ($screen.MaxHorizontalImageSize -gt $maxWidth) { $maxWidth = $screen.MaxHorizontalImageSize }; if ($screen.MaxVerticalImageSize -gt $maxHeight) { $maxHeight = $screen.MaxVerticalImageSize } }; Write-Host ($maxWidth.ToString() + \'x\' + $maxHeight.ToString())"';
+                const result2 = (0, child_process_1.execSync)(command2, { encoding: 'utf8', timeout: 5000 }).trim();
+                const match2 = result2.match(/(\d+)x(\d+)/);
+                if (match2) {
+                    const width = parseInt(match2[1]);
+                    const height = parseInt(match2[2]);
+                    if (width >= 800 && height >= 600) {
+                        console.log(`Detected screen resolution (WMI): ${width}x${height}`);
+                        return { width, height };
+                    }
+                }
+            }
+            catch (error) {
+                console.log(`Method 2 failed: ${error.message}`);
+            }
+            // Method 3: Use PowerShell with System.Windows.Forms.Screen.AllScreens and get the largest
+            try {
+                const command3 = 'powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $screens = [System.Windows.Forms.Screen]::AllScreens; $maxWidth = 0; $maxHeight = 0; foreach ($screen in $screens) { if ($screen.Bounds.Width -gt $maxWidth) { $maxWidth = $screen.Bounds.Width }; if ($screen.Bounds.Height -gt $maxHeight) { $maxHeight = $screen.Bounds.Height } }; Write-Host ($maxWidth.ToString() + \'x\' + $maxHeight.ToString())"';
+                const result3 = (0, child_process_1.execSync)(command3, { encoding: 'utf8', timeout: 5000 }).trim();
+                const match3 = result3.match(/(\d+)x(\d+)/);
+                if (match3) {
+                    const width = parseInt(match3[1]);
+                    const height = parseInt(match3[2]);
+                    if (width >= 800 && height >= 600) {
+                        console.log(`Detected screen resolution (All Screens - Largest): ${width}x${height}`);
+                        return { width, height };
+                    }
+                }
+            }
+            catch (error) {
+                console.log(`Method 3 failed: ${error.message}`);
+            }
+            // Method 4: Use wmic (legacy but reliable)
+            try {
+                const command4 = 'wmic desktopmonitor get screenheight,screenwidth /format:list';
+                const result4 = (0, child_process_1.execSync)(command4, { encoding: 'utf8', timeout: 5000 }).trim();
+                const widthMatch = result4.match(/ScreenWidth=(\d+)/);
+                const heightMatch = result4.match(/ScreenHeight=(\d+)/);
+                if (widthMatch && heightMatch) {
+                    const width = parseInt(widthMatch[1]);
+                    const height = parseInt(heightMatch[1]);
+                    if (width >= 800 && height >= 600) {
+                        console.log(`Detected screen resolution (WMIC): ${width}x${height}`);
+                        return { width, height };
+                    }
+                }
+            }
+            catch (error) {
+                console.log(`Method 4 failed: ${error.message}`);
+            }
+            console.log('All Windows detection methods failed, using default 1920x1080');
         }
         else if (platform === 'darwin') {
             // macOS: Use system_profiler
