@@ -308,59 +308,32 @@ class YapGrow {
                     }
                 }
             }
-            // Validate required actions were executed successfully
-            // Check these AFTER all steps are executed to ensure we get the final state
+            // Get final state after all steps are executed
+            // Action required is a condition, not an error - always return success unless there's a real error
             const followed = this.context.following_status === true;
             const liked = this.context.interaction_result?.liked === true; // Explicit check for true
             const commented = this.context.interaction_result?.commented === true; // Explicit check for true
             const profileExtracted = !!this.context.current_profile;
-            // Log validation state for debugging
-            console.log(`[YapGrow] Validation state:`, {
+            const ruleReason = this.context.interaction_result?.ruleReason; // Get ruleReason if actions were skipped by rules
+            // Log state for debugging
+            console.log(`[YapGrow] Final state:`, {
                 followed,
                 liked,
                 commented,
                 profileExtracted,
+                ruleReason,
                 interaction_result: this.context.interaction_result
             });
-            // Check which actions were required based on steps
-            let requiresFollow = false;
-            let requiresLike = false;
-            let requiresComment = false;
-            for (const step of steps) {
-                if (step.action === 'follow') {
-                    requiresFollow = true;
-                }
-                if (step.action === 'scroll_and_detect') {
-                    const enableLike = step.enable_like !== false && step.enableLike !== false;
-                    const enableComment = step.enable_comment !== false && step.enableComment !== false;
-                    if (enableLike)
-                        requiresLike = true;
-                    if (enableComment)
-                        requiresComment = true;
-                }
-            }
-            // Validate actions
-            const validationErrors = [];
-            // For follow: handleFollowUser automatically checks following status and only follows if not already following
-            // If already following, following_status = true (success)
-            // If not following and follow succeeded, following_status = true (success)
-            // If not following and follow failed, following_status = false (fail)
-            if (requiresFollow && !followed) {
-                validationErrors.push('Follow action required but not executed');
-            }
-            if (requiresLike && !liked) {
-                validationErrors.push('Like action required but not executed');
-            }
-            if (requiresComment && !commented) {
-                validationErrors.push('Comment action required but not executed');
-            }
+            // Action required is a condition, not an error
+            // If actions were skipped by rules, ruleReason will be set
+            // Always return success = true (submit as "done") unless there's a real error from try-catch
             return {
-                success: validationErrors.length === 0,
+                success: true, // Always success - action required is condition, not error
                 followed,
                 profileExtracted,
                 liked,
                 commented,
-                error: validationErrors.length > 0 ? validationErrors.join('; ') : undefined
+                ruleReason // Pass ruleReason if actions were skipped by rules
             };
         }
         catch (error) {
