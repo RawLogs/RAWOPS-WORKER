@@ -17,6 +17,8 @@ async function runGrowFlow(run, apiService, activeBrowsers) {
             throw new Error('Security violation: No userId found for run');
         }
         console.log(`[${run.id}] Using userId from run: ${userId}`);
+        // Clear all failed cache when starting grow flow
+        await (0, cache_1.clearFailedCache)(run);
         // Load user-specific grow settings with userId for Gemini API key
         let settings;
         try {

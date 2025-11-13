@@ -34,10 +34,40 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.clearFailedCache = clearFailedCache;
 exports.processCacheForRun = processCacheForRun;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const rawbot_1 = require("@rawops/rawbot");
+/**
+ * Clear all failed cache for a profile
+ */
+async function clearFailedCache(run) {
+    const cacheDir = path.join(process.cwd(), 'cache', `profile_${run.profile.handle}`);
+    const failedPath = path.join(cacheDir, 'failed.json');
+    try {
+        if (fs.existsSync(failedPath)) {
+            // Read current failed data to log count
+            let failedCount = 0;
+            try {
+                const failedData = JSON.parse(fs.readFileSync(failedPath, 'utf8'));
+                failedCount = failedData.length;
+            }
+            catch (error) {
+                // Ignore read errors
+            }
+            // Clear failed cache by writing empty array
+            fs.writeFileSync(failedPath, JSON.stringify([], null, 2));
+            console.log(`[${run.id}] 🗑️ Cleared ${failedCount} failed links from cache for grow flow`);
+        }
+        else {
+            console.log(`[${run.id}] No failed cache to clear`);
+        }
+    }
+    catch (error) {
+        console.error(`[${run.id}] Error clearing failed cache:`, error);
+    }
+}
 /**
  * Process cache files to filter out already processed links and clean up data
  */

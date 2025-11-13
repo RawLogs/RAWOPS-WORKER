@@ -226,19 +226,39 @@ class YapGrow {
                         console.log(`[YapGrow] ✅ Successfully processed: ${link}`);
                     }
                     else {
-                        failedLinks.push(link);
                         const errorMsg = result.error || 'Unknown error';
-                        errors.push(`Failed to process ${link}: ${errorMsg}`);
-                        // Use parallel operations for better performance (same as yap comment)
-                        const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'failed', {
-                            error: errorMsg,
-                            runId: this.runId
-                        }, 'GROW');
-                        // Log any errors from parallel operations
-                        if (parallelResult.errors.length > 0) {
-                            errors.push(...parallelResult.errors);
+                        // Check if this is "Follow action required but not executed" - treat as done instead of failed
+                        if (errorMsg.includes('Follow action required but not executed')) {
+                            processedLinks.push(link);
+                            // Report as done with the error message in details
+                            const details = {
+                                liked: result.liked || false,
+                                commented: result.commented || false,
+                                followed: result.followed || false,
+                                runId: this.runId,
+                                note: errorMsg // Include the message as a note
+                            };
+                            const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'done', details, 'GROW');
+                            // Log any errors from parallel operations
+                            if (parallelResult.errors.length > 0) {
+                                errors.push(...parallelResult.errors);
+                            }
+                            console.log(`[YapGrow] ✅ Processed (follow action required but not executed): ${link}`);
                         }
-                        console.log(`[YapGrow] ❌ Failed to process: ${link} - ${errorMsg}`);
+                        else {
+                            failedLinks.push(link);
+                            errors.push(`Failed to process ${link}: ${errorMsg}`);
+                            // Use parallel operations for better performance (same as yap comment)
+                            const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, link, 'failed', {
+                                error: errorMsg,
+                                runId: this.runId
+                            }, 'GROW');
+                            // Log any errors from parallel operations
+                            if (parallelResult.errors.length > 0) {
+                                errors.push(...parallelResult.errors);
+                            }
+                            console.log(`[YapGrow] ❌ Failed to process: ${link} - ${errorMsg}`);
+                        }
                     }
                     // Move to next link
                     i++;
@@ -251,10 +271,30 @@ class YapGrow {
                 catch (error) {
                     // Link might not be defined if error occurs before assignment
                     const currentLink = link || filteredLinks[i] || 'unknown';
-                    failedLinks.push(currentLink);
                     const errorMsg = error instanceof Error ? error.message : String(error);
-                    errors.push(`Error processing link ${currentLink}: ${errorMsg}`);
-                    console.error(`[YapGrow] Error processing link ${currentLink}:`, error);
+                    // Check if this is "Follow action required but not executed" - treat as done instead of failed
+                    if (errorMsg.includes('Follow action required but not executed')) {
+                        processedLinks.push(currentLink);
+                        // Report as done with the error message in details
+                        const details = {
+                            liked: false,
+                            commented: false,
+                            followed: false,
+                            runId: this.runId,
+                            note: errorMsg // Include the message as a note
+                        };
+                        const parallelResult = await (0, utils_1.saveCacheAndSubmitAPI)(this.cacheDir, this.profileId, currentLink, 'done', details, 'GROW');
+                        // Log any errors from parallel operations
+                        if (parallelResult.errors.length > 0) {
+                            errors.push(...parallelResult.errors);
+                        }
+                        console.log(`[YapGrow] ✅ Processed (follow action required but not executed): ${currentLink}`);
+                    }
+                    else {
+                        failedLinks.push(currentLink);
+                        errors.push(`Error processing link ${currentLink}: ${errorMsg}`);
+                        console.error(`[YapGrow] Error processing link ${currentLink}:`, error);
+                    }
                     // Move to next link even on error
                     i++;
                 }
