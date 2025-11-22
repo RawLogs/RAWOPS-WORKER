@@ -28,194 +28,55 @@ No hardcoded secrets, API tokens, or unsafe scripts are present in this reposito
 
 AI automation worker với Selenium và local browser cho Twitter automation.
 
-## ⚡Cai dat nhanh (Khuyến nghị)
+## 📥 Tải project
 
-Cách nhanh nhất để bắt đầu:
+### Cài Git (nếu chưa có)
+**Windows:** [Tải Git](https://git-scm.com/install/windows) → Cài đặt mặc định (Next → Next → Install)  
+**macOS/Linux:** Git thường đã được cài sẵn
 
-### Bước 1: Tải Chromium/ChromeDriver
-
-**Cách 1: Sử dụng script tự động (Khuyến nghị)**
-
-#### Windows:
-1. Mở thư mục `RAWOPS-WORKER`
-2. **Chuột phải vào file `win_chrome_downloader.bat`** → Chọn **Run as administrator** (hoặc double-click)
-3. Script sẽ tự động tải và cài đặt ChromeDriver vào thư mục `chromium/`
-4. Đợi quá trình tải hoàn tất
-
-#### macOS/Linux:
-1. Mở Terminal
-2. Di chuyển đến thư mục `RAWOPS-WORKER`:
-   ```bash
-   cd /đường/dẫn/đến/RAWOPS-WORKER
-   ```
-3. Cấp quyền thực thi và chạy script:
-   ```bash
-   chmod +x macos_chrome_downloader.sh
-   ./macos_chrome_downloader.sh
-   ```
-4. Trả lời câu hỏi "Da co chromedriver chua? (y/n)" → Nhấn `n` nếu chưa có
-5. Script sẽ tự động phát hiện phiên bản Chrome và tải ChromeDriver phù hợp vào thư mục `chromium/`
-
-**Cách 2: Tải thủ công**
-1. [Tải Chromium](https://cdn.rawops.net/f/orHj/chromium.zip)
-2. Mở thư mục RAWOPS-WORKER (nơi bạn đã giải nén project)
-3. **Tạo thư mục `chromium`**:
-   - Click chuột phải vào khoảng trống trong thư mục RAWOPS-WORKER
-   - Chọn **New** → **Folder**
-   - Đặt tên là `chromium`
-4. **Giải nén file zip**:
-   - Click chuột phải vào file `chromium.zip` đã tải về
-   - Chọn **Extract All...** (hoặc **Extract to...** nếu dùng WinRAR/7-Zip)
-   - Chọn thư mục `chromium` vừa tạo làm nơi giải nén
-   - Click **Extract** để giải nén
-
-
-
-### Bước 3: Chạy Worker
-1. Mở thư mục RAWOPS-WORKER
-2. Tìm file `start.bat`
-3. **Double-click** vào file `start.bat` để chạy (không cần mở PowerShell)
-4. Cửa sổ Command Prompt sẽ tự động mở và chạy worker
-
-Script sẽ tự động:
-- ✅ Kiểm tra và cài đặt dependencies
-- ✅ Tạo file `.env.local` nếu chưa có
-- ✅ Yêu cầu nhập API_KEY nếu chưa được cấu hình
-- ✅ Khởi động worker
-
-**Lưu ý**: Cần có API_KEY từ rawops.net. Tham gia nhóm Telegram để được cấp tài khoản: https://t.me/+__jEuPbz8EM4MjM1
+### Clone repository
+```bash
+git clone https://github.com/RawLogs/RAWOPS-WORKER.git
+cd RAWOPS-WORKER
+```
 
 ---
 
-## 🚀 Hướng dẫn Cài đặt và Chạy thu cong (Chi tiết)
+## ⚡ Cài đặt nhanh (3 bước)
 
-### 0. Join Nhóm và Cấp Tài khoản
-```bash
-# Join nhóm Telegram để được hỗ trợ và cấp tài khoản
-# Link: https://t.me/+__jEuPbz8EM4MjM1
+### Bước 1: Tải Chromium
+**Windows:** Double-click vào `win_chrome_downloader.bat`  
+**macOS/Linux:** Chạy `./macos_chrome_downloader.sh`  
+**Hoặc:** [Tải thủ công](https://cdn.rawops.net/f/orHj/chromium.zip) và giải nén vào thư mục `chromium/`
 
-# Liên hệ admin để được cấp tài khoản rawops.net
-# Tài khoản cần thiết để sử dụng API và các tính năng premium
-```
+### Bước 2: Chạy Worker
+Double-click vào file `start.bat` (Windows) hoặc `start.ps1` (PowerShell)
 
-### 1. Cài đặt Node.js
-```bash
-# Tải và cài đặt Node.js từ https://nodejs.org/
-# Khuyến nghị: Node.js 18+ hoặc 20+
-```
+### Bước 3: Nhập API_KEY
+Khi được yêu cầu, nhập API_KEY của bạn từ rawops.net
 
-### 2. Cài đặt pnpm
-```bash
-# Cài đặt pnpm globally
-npm install -g pnpm
-```
+**Lấy API_KEY:** Tham gia nhóm Telegram: https://t.me/+__jEuPbz8EM4MjM1
 
-### 3. Cài đặt Dependencies
-```bash
-# Cài đặt tất cả dependencies
-pnpm install
-```
+---
 
-### 4. Cấu hình Environment
-```bash
-# Copy file example thành .env.local
-cp example .env.local
+Script `start.bat` sẽ tự động:
+- ✅ Cài đặt dependencies
+- ✅ Tạo file `.env.local`
+- ✅ Khởi động worker
 
-# Chỉnh sửa .env.local với các thông tin cần thiết
-# - API keys
-```
+## ⚙️ Cấu hình
 
-### 5. Tải Chromium Browser
-
-**Cách 1: Sử dụng script tự động (Khuyến nghị)**
-
-#### Windows:
-```bash
-# Chạy script tự động (Run as administrator)
-win_chrome_downloader.bat
-
-# Script sẽ tự động tải ChromeDriver phù hợp với phiên bản Chrome của bạn
-```
-
-#### macOS/Linux:
-```bash
-# Cấp quyền thực thi
-chmod +x macos_chrome_downloader.sh
-
-# Chạy script
-./macos_chrome_downloader.sh
-
-# Trả lời "n" nếu chưa có ChromeDriver
-# Script sẽ tự động phát hiện phiên bản Chrome và tải ChromeDriver
-```
-
-**Cách 2: Tải thủ công**
-```bash
-# Tải từ link: https://cdn.rawops.net/f/orHj/chromium.zip
-# Và giải nén vào thư mục chromium/
-```
-
-### 6. Tạo Profiles Directory
-```bash
-# Tạo thư mục profiles để lưu browser profiles
-mkdir profiles
-
-# Profiles sẽ được tự động tạo khi chạy worker
-# Mỗi profile sẽ có tên riêng và cấu hình độc lập
-```
-
-### 7. Chạy Worker
-
-#### Cách 1: Sử dụng script tự động (Khuyến nghị) ⬆️ Xem phần Quick Start ở trên
-
-#### Cách 2: Chạy thủ công
-```bash
-# Chạy worker trong production mode
-pnpm start
-
-# Hoặc chạy trong development mode
-pnpm run dev
-```
-
-## 📁 Cấu trúc Thư mục
-
-```
-RAWOPS-WORKER/
-├── worker/
-├── packages/                # Packages workspace
-├── chromium/               # Chromium browser files
-├── profiles/              # Browser profiles
-│   ├── DefaultUser/       # Default profile
-│   └── [custom-profiles]/ # Custom profiles
-├── cache/                 # Cache files
-└── package.json           # Dependencies và scripts
-```
-
-## 🔧 Scripts Available
-
-```bash
-# Chạy worker
-pnpm start
-```
-
-## ⚙️ Environment Variables
-
-Tạo file `.env.local` ở root của project với các biến sau:
+File `.env.local` sẽ được tự động tạo khi chạy `start.bat`. Nếu cần chỉnh sửa thủ công:
 
 ```env
 WEB_API_URL=https://rawops.net/api
 API_KEY=rawops_your_api_key_here
 ```
 
-**Lưu ý**: File `.env.local` nằm ở root `I:\AI\RAWOPS\RAWOPS-WORKER\.env.local`
+## 🐛 Xử lý lỗi
 
-Nếu sử dụng `start.bat` hoặc `start.ps1`, file sẽ được tự động tạo và yêu cầu nhập API_KEY khi chạy.
-
-## 🐛 Troubleshooting
-
-### Lỗi "Cannot find module"
+**Lỗi "Cannot find module":**
 ```bash
-# Reinstall dependencies
 rm -rf node_modules
 pnpm install
 ```
