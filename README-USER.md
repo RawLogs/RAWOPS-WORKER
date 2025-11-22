@@ -33,7 +33,7 @@ Hoặc tải trực tiếp:
    → Copy **API_KEY** của bạn.  
 2. Vào 👉 [https://aistudio.google.com/usage?timeRange=last-28-days](https://aistudio.google.com/usage?timeRange=last-28-days)  
    → Lấy **Gemini API Key**.  
-3. Dán 2 KEY này vào file cấu hình khi được yêu cầu (hoặc chỉnh trực tiếp trong `.env.local` nếu làm thủ công).
+3. Dán 1 **API_KEY** này vào file cấu hình khi được yêu cầu (hoặc chỉnh trực tiếp trong `.env.local` nếu làm thủ công).
 
 ---
 
