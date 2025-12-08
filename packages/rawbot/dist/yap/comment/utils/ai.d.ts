@@ -8,10 +8,6 @@ export declare function generateCommentWithUserStyles(postContent: string, setti
  */
 export declare function selectRandomPromptStyle(availableStyles: any[]): any;
 /**
- * Generate comment using Gemini AI with model fallback
- */
-export declare function generateCommentWithGemini(prompt: string, apiKey: string): Promise<string | null>;
-/**
  * Clean comment for BMP compatibility and remove formatting
  */
 export declare function cleanCommentForBMP(comment: string): string;

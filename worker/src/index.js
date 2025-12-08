@@ -5,19 +5,65 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
+const express_1 = __importDefault(require("express"));
 const services_1 = __importDefault(require("./services"));
 const profile_1 = require("./flows/profile");
 const project_1 = require("./flows/project");
 const grow_1 = require("./flows/grow");
 const comment_1 = require("./flows/comment");
 const POLL_INTERVAL = 5000; // 5 seconds
+const WORKER_VERSION = 'rawops_1.0.0';
 // Initialize API service
 const apiService = new services_1.default();
 // Track active browsers by run ID
 const activeBrowsers = new Map();
 // --- Main Worker Loop ---
 async function main() {
-    console.log('🚀 Worker started. Polling for jobs...');
+    // Start HTTP server for health checks and port binding
+    const app = (0, express_1.default)();
+    const PORT = 6182;
+    // Enable CORS
+    app.use((req, res, next) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+    });
+    app.get('/', (req, res) => {
+        res.send('Worker is running');
+    });
+    app.get('/health', (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        res.json({ status: 'ok', version: WORKER_VERSION, timestamp: new Date().toISOString() });
+    });
+    app.get('/version', (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        res.json({ version: WORKER_VERSION });
+    });
+    app.listen(PORT, () => {
+        const { baseUrl, hasKey } = apiService.getConnectionInfo();
+        // ANSI Colors
+        const green = '\x1b[32m';
+        const cyan = '\x1b[36m';
+        const reset = '\x1b[0m';
+        const dim = '\x1b[2m';
+        console.log('\n');
+        console.log(dim + '╔═══════════════════════════════════════════════════════════════╗' + reset);
+        console.log(dim + '║' + reset + green + '                 WORKER STARTED SUCCESSFULLY                   ' + reset + dim + '║' + reset);
+        console.log(dim + '╠═══════════════════════════════════════════════════════════════╣' + reset);
+        console.log(dim + '║                                                               ║' + reset);
+        console.log(dim + '║' + reset + '   API Service:                                                ' + dim + '║' + reset);
+        console.log(dim + '║' + reset + `      URL: ${cyan}${baseUrl.padEnd(51)}${reset}` + dim + '║' + reset);
+        console.log(dim + '║' + reset + `      Key: ${(hasKey ? green + 'Connected' : '\x1b[31mNot connected').padEnd(60)}${reset}` + dim + '║' + reset);
+        console.log(dim + '║' + reset + '                                                               ' + dim + '║' + reset);
+        console.log(dim + '║' + reset + '   Server:                                                     ' + dim + '║' + reset);
+        console.log(dim + '║' + reset + `      Port: ${cyan}${PORT.toString().padEnd(50)}${reset}` + dim + '║' + reset);
+        console.log(dim + '║' + reset + `      Health: ${cyan}http://localhost:${PORT}/health`.padEnd(62) + reset + dim + '║' + reset);
+        console.log(dim + '║' + reset + `      Version: ${cyan}${WORKER_VERSION.padEnd(47)}${reset}` + dim + '║' + reset);
+        console.log(dim + '║' + reset + '                                                               ' + dim + '║' + reset);
+        console.log(dim + '╚═══════════════════════════════════════════════════════════════╝' + reset);
+        console.log('\nWaiting for jobs...');
+    });
     setInterval(async () => {
         // Check for queued runs
         const run = await findAndLockQueuedRun();
@@ -35,7 +81,7 @@ async function main() {
             }
             const profileHandle = run.profile?.handle;
             if (!profileHandle || profileHandle === 'unknown') {
-                console.log(`[${run.id}] ⚠️ Run skipped: Profile handle is unknown.`);
+                console.log(`[${run.id}] ⚠️ Run skipped: API expired or invalid.`);
             }
             else {
                 console.log(`[${run.id}] Found job of type '${run.type}' for account: ${profileHandle}. Starting...`);

@@ -1,12 +1,11 @@
 "use strict";
 // packages/rawbot/src/yap/comment/utils/index.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bulkUpdateLinksStatusAPI = exports.saveCacheAndSubmitAPI = exports.saveLinkStatusToAPI = exports.filterProcessedLinks = exports.updateRemainingLinksAPI = exports.submitCacheToAPI = exports.saveToCache = exports.ensureCacheDirectory = exports.getPageInfo = exports.waitForPageLoad = exports.checkPageLoad = exports.performRandomMouseMovements = exports.performIdleScroll = exports.scrollToFindComments = exports.performRandomScrollPattern = exports.generateReplyToTweetComment = exports.generateReplyToComment = exports.cleanCommentForBMP = exports.generateCommentWithGemini = exports.selectRandomPromptStyle = exports.generateCommentWithUserStyles = void 0;
+exports.bulkUpdateLinksStatusAPI = exports.saveCacheAndSubmitAPI = exports.saveLinkStatusToAPI = exports.filterProcessedLinks = exports.updateRemainingLinksAPI = exports.submitCacheToAPI = exports.saveToCache = exports.ensureCacheDirectory = exports.getPageInfo = exports.waitForPageLoad = exports.checkPageLoad = exports.performRandomMouseMovements = exports.performIdleScroll = exports.scrollToFindComments = exports.performRandomScrollPattern = exports.generateReplyToTweetComment = exports.generateReplyToComment = exports.cleanCommentForBMP = exports.selectRandomPromptStyle = exports.generateCommentWithUserStyles = void 0;
 // AI utilities
 var ai_1 = require("./ai");
 Object.defineProperty(exports, "generateCommentWithUserStyles", { enumerable: true, get: function () { return ai_1.generateCommentWithUserStyles; } });
 Object.defineProperty(exports, "selectRandomPromptStyle", { enumerable: true, get: function () { return ai_1.selectRandomPromptStyle; } });
-Object.defineProperty(exports, "generateCommentWithGemini", { enumerable: true, get: function () { return ai_1.generateCommentWithGemini; } });
 Object.defineProperty(exports, "cleanCommentForBMP", { enumerable: true, get: function () { return ai_1.cleanCommentForBMP; } });
 Object.defineProperty(exports, "generateReplyToComment", { enumerable: true, get: function () { return ai_1.generateReplyToComment; } });
 Object.defineProperty(exports, "generateReplyToTweetComment", { enumerable: true, get: function () { return ai_1.generateReplyToTweetComment; } });

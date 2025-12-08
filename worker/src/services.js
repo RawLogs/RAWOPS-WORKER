@@ -18,10 +18,9 @@ function displayLogo() {
     console.log('║                    ██║  ██║██║  ██║╚███╔███╔╝                 ║');
     console.log('║                    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝                  ║');
     console.log('║                                                               ║');
-    console.log('║                        🤖 RAWOPS WORKER 🤖                    ║');
+    console.log('║                          RAWOPS WORKER                        ║');
     console.log('║                                                               ║');
     console.log('╚═══════════════════════════════════════════════════════════════╝');
-    console.log('\n');
 }
 // Load environment variables first
 const envPath = path_1.default.join(process.cwd(), '.env.local');
@@ -108,9 +107,8 @@ class ApiService {
         displayLogo();
         this.baseUrl = process.env.WEB_API_URL || '';
         this.apiKey = process.env.API_KEY || '';
-        console.log('🔧 API Service initialized:');
-        console.log('   📡 Base URL:', this.baseUrl);
-        console.log('   🔑 API Key:', this.apiKey ? '✅ Present' : '❌ Not set');
+        this.baseUrl = process.env.WEB_API_URL || '';
+        this.apiKey = process.env.API_KEY || '';
         if (!this.apiKey) {
             console.warn('⚠️  API_KEY not found in environment variables!');
             console.warn('   Please create a .env file in the worker directory with:');
@@ -126,6 +124,12 @@ class ApiService {
             headers['Authorization'] = `Bearer ${this.apiKey}`;
         }
         return headers;
+    }
+    getConnectionInfo() {
+        return {
+            baseUrl: this.baseUrl,
+            hasKey: !!this.apiKey
+        };
     }
     // Run operations
     async findAndLockQueuedRun() {

@@ -18,6 +18,13 @@ export interface YapGrowSettings {
     tweetTimeFilterHours?: number;
     aiCommentEnabled?: boolean;
     geminiApiKey?: string;
+    profileApiKeys?: {
+        geminiApiKey?: string | null;
+        openaiApiKey?: string | null;
+        deepseekApiKey?: string | null;
+        huggingfaceApiKey?: string | null;
+        apiKeyPriority?: string[];
+    };
     aiModel?: string;
     aiCommentPrompt?: string;
     aiLanguage?: string;

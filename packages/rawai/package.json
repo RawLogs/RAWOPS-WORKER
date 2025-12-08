@@ -1,7 +1,7 @@
 {
   "name": "@rawops/rawai",
   "version": "1.0.0",
-  "description": "AI services library for Twitter automation using Gemini",
+  "description": "AI services library for Twitter automation using multiple AI providers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,14 +10,25 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.2.0",
+    "@google/genai": "^1.31.0",
+    "@huggingface/inference": "^4.13.4",
+    "openai": "^6.10.0",
     "playwright": "^1.40.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
     "@types/node": "^20.0.0"
   },
-  "keywords": ["ai", "gemini", "twitter", "automation", "content-generation"],
+  "keywords": [
+    "ai",
+    "gemini",
+    "openai",
+    "deepseek",
+    "huggingface",
+    "twitter",
+    "automation",
+    "content-generation"
+  ],
   "author": "xNextjs",
   "license": "MIT"
 }

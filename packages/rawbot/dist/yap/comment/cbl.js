@@ -107,13 +107,37 @@ class CommentByLink {
                 };
             }
             // Initialize AI if enabled
-            if (settings.aiCommentEnabled && settings.geminiApiKey) {
-                this.contentAI = new rawai_1.ContentAI({
-                    apiKey: settings.geminiApiKey,
+            const hasGeminiKey = !!settings.geminiApiKey;
+            const hasProfileKeys = settings.profileApiKeys && (settings.profileApiKeys.geminiApiKey ||
+                settings.profileApiKeys.openaiApiKey ||
+                settings.profileApiKeys.deepseekApiKey ||
+                settings.profileApiKeys.huggingfaceApiKey);
+            if (settings.aiCommentEnabled && (hasGeminiKey || hasProfileKeys)) {
+                const aiConfig = {
                     model: settings.aiModel || 'gemini-flash-latest',
                     maxRetries: 3,
                     retryDelay: 2000
-                });
+                };
+                const apiKeys = {};
+                if (settings.profileApiKeys) {
+                    apiKeys.gemini = settings.profileApiKeys.geminiApiKey;
+                    apiKeys.openai = settings.profileApiKeys.openaiApiKey;
+                    apiKeys.deepseek = settings.profileApiKeys.deepseekApiKey;
+                    apiKeys.huggingface = settings.profileApiKeys.huggingfaceApiKey;
+                    if (settings.profileApiKeys.apiKeyPriority) {
+                        aiConfig.providerPriority = settings.profileApiKeys.apiKeyPriority;
+                    }
+                }
+                // Map legacy geminiApiKey if not already present
+                if (settings.geminiApiKey && !apiKeys.gemini) {
+                    apiKeys.gemini = settings.geminiApiKey;
+                }
+                aiConfig.apiKeys = apiKeys;
+                // Ensure we have at least one provider if priority list is empty or missing
+                if (!aiConfig.providerPriority && apiKeys.gemini) {
+                    aiConfig.providerPriority = ['gemini'];
+                }
+                this.contentAI = new rawai_1.ContentAI(aiConfig);
                 console.log('[YapComment] AI initialized for comment generation');
             }
             // Process each link

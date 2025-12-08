@@ -1,69 +1,113 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseAI = void 0;
-const generative_ai_1 = require("@google/generative-ai");
+const providers_1 = require("./providers");
 class BaseAI {
     constructor(config) {
+        this.providers = new Map();
         this.config = {
-            model: 'gemini-flash-latest',
-            modelChain: ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
             maxRetries: 3,
             retryDelay: 1000,
+            providerPriority: ['openai', 'gemini', 'deepseek', 'huggingface'],
             ...config
         };
-        this.genAI = new generative_ai_1.GoogleGenerativeAI(this.config.apiKey);
+        // Initialize providers
+        this.initializeProviders();
+        // Set primary provider
+        this.primaryProvider = this.getPrimaryProvider();
+    }
+    initializeProviders() {
+        // Handle legacy single provider config
+        if (this.config.apiKey && this.config.provider) {
+            this.addProvider(this.config.provider, this.config.apiKey);
+        }
+        // Handle multi-provider config
+        if (this.config.apiKeys) {
+            Object.entries(this.config.apiKeys).forEach(([provider, key]) => {
+                if (key && typeof key === 'string') {
+                    this.addProvider(provider, key);
+                }
+            });
+        }
+    }
+    addProvider(type, apiKey) {
+        try {
+            const provider = (0, providers_1.createProvider)(type, {
+                apiKey,
+                maxRetries: this.config.maxRetries,
+                retryDelay: this.config.retryDelay
+            });
+            this.providers.set(type, provider);
+        }
+        catch (error) {
+            console.warn(`Failed to initialize provider ${type}:`, error);
+        }
+    }
+    getPrimaryProvider() {
+        // Try to find first available provider from priority list
+        if (this.config.providerPriority) {
+            for (const type of this.config.providerPriority) {
+                if (this.providers.has(type)) {
+                    return type;
+                }
+            }
+        }
+        // Fallback to any available provider
+        if (this.providers.size > 0) {
+            const first = this.providers.keys().next().value;
+            if (first)
+                return first;
+        }
+        // Default to configured provider if no providers initialized (will throw later)
+        return this.config.provider || 'gemini';
     }
     /**
-     * Generate content with retry logic and model fallback
+     * Get the current provider name
+     */
+    get providerName() {
+        return this.primaryProvider;
+    }
+    /**
+     * Generate content with retry logic and provider fallback
      */
     async generateWithRetry(prompt, customModelChain) {
-        const modelChain = customModelChain || this.config.modelChain || [this.config.model];
-        for (const modelName of modelChain) {
-            for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
-                try {
-                    const model = this.genAI.getGenerativeModel({ model: modelName });
-                    const result = await model.generateContent(prompt);
-                    const response = await result.response;
-                    const content = response.text().trim();
-                    if (content && content.length > 0) {
-                        return {
-                            success: true,
-                            content,
-                            model: modelName,
-                            attempts: attempt
-                        };
-                    }
-                    // If content is empty, retry
-                    if (attempt < this.config.maxRetries) {
-                        await this.delay(this.config.retryDelay * attempt);
-                    }
+        const priorityList = this.config.providerPriority || [];
+        // Add any providers not in priority list to the end
+        for (const type of this.providers.keys()) {
+            if (!priorityList.includes(type)) {
+                priorityList.push(type);
+            }
+        }
+        let lastError;
+        let totalAttempts = 0;
+        // Iterate through providers in priority order
+        for (const providerType of priorityList) {
+            const provider = this.providers.get(providerType);
+            if (!provider)
+                continue;
+            try {
+                const result = await provider.generateContent(prompt, customModelChain);
+                if (result.success) {
+                    return {
+                        ...result,
+                        attempts: totalAttempts + (result.attempts || 1)
+                    };
                 }
-                catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    // Check if it's a rate limit or quota error
-                    const isRateLimit = errorMessage.includes('503') ||
-                        errorMessage.includes('rate limit') ||
-                        errorMessage.includes('quota') ||
-                        errorMessage.includes('429') ||
-                        errorMessage.includes('overloaded') ||
-                        errorMessage.includes('Service Unavailable');
-                    if (isRateLimit && attempt < this.config.maxRetries) {
-                        const waitTime = this.config.retryDelay * Math.pow(2, attempt - 1);
-                        await this.delay(waitTime);
-                        continue;
-                    }
-                    // If it's the last attempt for this model, try next model
-                    if (attempt === this.config.maxRetries) {
-                        break;
-                    }
-                    await this.delay(this.config.retryDelay * attempt);
-                }
+                lastError = result.error;
+                totalAttempts += (result.attempts || 0);
+                // Log warning but continue to next provider
+                console.warn(`Provider ${providerType} failed: ${result.error}. Trying next provider...`);
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                lastError = errorMessage;
+                console.warn(`Provider ${providerType} error: ${errorMessage}. Trying next provider...`);
             }
         }
         return {
             success: false,
-            error: 'All models and retry attempts failed',
-            attempts: this.config.maxRetries * modelChain.length
+            error: lastError || 'All providers failed',
+            attempts: totalAttempts
         };
     }
     /**
@@ -93,16 +137,15 @@ class BaseAI {
     }
     /**
      * Validate API key
+     * Checks if at least one provider is valid
      */
     async validateApiKey() {
-        try {
-            const model = this.genAI.getGenerativeModel({ model: this.config.model });
-            await model.generateContent('Test');
-            return true;
+        for (const provider of this.providers.values()) {
+            if (await provider.validateApiKey()) {
+                return true;
+            }
         }
-        catch (error) {
-            return false;
-        }
+        return false;
     }
 }
 exports.BaseAI = BaseAI;

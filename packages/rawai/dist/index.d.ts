@@ -1,10 +1,13 @@
-import { BaseAI, AIConfig } from './base';
+import { BaseAI, AIConfig, ProviderType } from './base';
 import { ContentAI } from './content';
 import { AnalysisAI } from './analysis';
 import { SelectionAI } from './selection';
 import { EvaluationAI } from './evaluation';
+import { createProvider, getAvailableProviders, GeminiProvider, OpenAIProvider, DeepSeekProvider, HuggingFaceProvider, BaseProvider } from './providers';
 export { BaseAI, ContentAI, AnalysisAI, SelectionAI, EvaluationAI };
-export type { AIResult, AIConfig } from './base';
+export { BaseProvider, GeminiProvider, OpenAIProvider, DeepSeekProvider, HuggingFaceProvider, createProvider, getAvailableProviders };
+export type { AIResult, AIConfig, ProviderType } from './base';
+export type { AIProviderResult, AIProviderConfig } from './providers';
 export type { ContentOptions, TweetContentOptions, PromptConfig } from './content';
 export type { AnalysisOptions, TweetAnalysis } from './analysis';
 export type { SelectionOptions, TweetSelection } from './selection';
@@ -17,7 +20,12 @@ export declare class RawAI {
     readonly analysis: AnalysisAI;
     readonly selection: SelectionAI;
     readonly evaluation: EvaluationAI;
+    private readonly config;
     constructor(config: AIConfig);
+    /**
+     * Get current provider name
+     */
+    get providerName(): ProviderType;
     /**
      * Validate API key
      */
@@ -27,7 +35,8 @@ export declare class RawAI {
      */
     getStatus(): Promise<{
         apiKeyValid: boolean;
+        provider: ProviderType;
         services: string[];
-        models: string[];
+        availableProviders: ProviderType[];
     }>;
 }

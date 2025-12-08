@@ -1,24 +1,29 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-export interface AIResult {
-    success: boolean;
-    content?: string;
-    error?: string;
-    model?: string;
-    attempts?: number;
-}
+import { BaseProvider, AIProviderResult, ProviderType } from './providers';
+export type AIResult = AIProviderResult;
 export interface AIConfig {
-    apiKey: string;
+    apiKey?: string;
+    provider?: ProviderType;
+    apiKeys?: Partial<Record<ProviderType, string | null>>;
+    providerPriority?: ProviderType[];
     model?: string;
     modelChain?: string[];
     maxRetries?: number;
     retryDelay?: number;
 }
 export declare class BaseAI {
-    protected genAI: GoogleGenerativeAI;
+    protected providers: Map<ProviderType, BaseProvider>;
     protected config: AIConfig;
+    protected primaryProvider: ProviderType;
     constructor(config: AIConfig);
+    private initializeProviders;
+    private addProvider;
+    private getPrimaryProvider;
     /**
-     * Generate content with retry logic and model fallback
+     * Get the current provider name
+     */
+    get providerName(): ProviderType;
+    /**
+     * Generate content with retry logic and provider fallback
      */
     protected generateWithRetry(prompt: string, customModelChain?: string[]): Promise<AIResult>;
     /**
@@ -31,6 +36,8 @@ export declare class BaseAI {
     protected delay(ms: number): Promise<void>;
     /**
      * Validate API key
+     * Checks if at least one provider is valid
      */
     validateApiKey(): Promise<boolean>;
 }
+export { ProviderType } from './providers';

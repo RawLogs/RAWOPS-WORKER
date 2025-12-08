@@ -3,7 +3,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCommentWithUserStyles = generateCommentWithUserStyles;
 exports.selectRandomPromptStyle = selectRandomPromptStyle;
-exports.generateCommentWithGemini = generateCommentWithGemini;
 exports.cleanCommentForBMP = cleanCommentForBMP;
 exports.generateReplyToComment = generateReplyToComment;
 exports.generateReplyToTweetComment = generateReplyToTweetComment;
@@ -22,9 +21,14 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
             console.log('[YapComment] AI comment generation is disabled');
             return null;
         }
-        // Check if we have Gemini API key for ContentAI
-        if (!settings.geminiApiKey) {
-            console.log('[YapComment] No Gemini API key provided');
+        // Check if we have any API keys
+        const hasGeminiKey = !!settings.geminiApiKey;
+        const hasProfileKeys = settings.profileApiKeys && (settings.profileApiKeys.geminiApiKey ||
+            settings.profileApiKeys.openaiApiKey ||
+            settings.profileApiKeys.deepseekApiKey ||
+            settings.profileApiKeys.huggingfaceApiKey);
+        if (!hasGeminiKey && !hasProfileKeys) {
+            console.log('[YapComment] No API keys provided (Gemini or Profile Keys)');
             return null;
         }
         // Determine which prompt to use
@@ -74,32 +78,44 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
                 }
             }
         }
-        // Initialize ContentAI with Gemini API key
-        const contentAI = new rawai_1.ContentAI({
-            apiKey: settings.geminiApiKey,
+        // Initialize ContentAI with multi-provider config
+        const aiConfig = {
             model: settings.aiModel || 'gemini-flash-latest'
-        });
+        };
+        if (settings.profileApiKeys) {
+            console.log('[YapComment] Using multi-provider AI config');
+            aiConfig.apiKeys = {
+                gemini: settings.profileApiKeys.geminiApiKey,
+                openai: settings.profileApiKeys.openaiApiKey,
+                deepseek: settings.profileApiKeys.deepseekApiKey,
+                huggingface: settings.profileApiKeys.huggingfaceApiKey
+            };
+            if (settings.profileApiKeys.apiKeyPriority) {
+                aiConfig.providerPriority = settings.profileApiKeys.apiKeyPriority;
+                console.log(`[YapComment] Provider priority: ${settings.profileApiKeys.apiKeyPriority.join(', ')}`);
+            }
+        }
+        else {
+            // Initialize empty apiKeys object if no profileApiKeys
+            aiConfig.apiKeys = {};
+        }
+        // Map legacy geminiApiKey if not already present
+        if (settings.geminiApiKey && !aiConfig.apiKeys.gemini) {
+            console.log('[YapComment] Mapping legacy Gemini key to multi-provider config');
+            aiConfig.apiKeys.gemini = settings.geminiApiKey;
+        }
+        // Ensure we have at least one provider if priority list is empty or missing
+        if (!aiConfig.providerPriority && aiConfig.apiKeys.gemini) {
+            aiConfig.providerPriority = ['gemini'];
+        }
+        const contentAI = new rawai_1.ContentAI(aiConfig);
+        console.log(`[YapComment] Prioritizing provider: ${contentAI.providerName}`);
         // Determine style from selectedPromptStyle or fallback to settings
         let commentStyle = 'friendly'; // Default fallback
         if (selectedPromptStyle && selectedPromptStyle.name) {
-            // Extract style from prompt style name (e.g., 'bro1' -> 'casual', 'adaptive1' -> 'friendly')
-            const styleName = selectedPromptStyle.name.toLowerCase();
-            if (styleName.includes('bro') || styleName.includes('casual')) {
-                commentStyle = 'casual';
-            }
-            else if (styleName.includes('professional') || styleName.includes('formal')) {
-                commentStyle = 'professional';
-            }
-            else if (styleName.includes('enthusiastic') || styleName.includes('excited')) {
-                commentStyle = 'enthusiastic';
-            }
-            else if (styleName.includes('analytical') || styleName.includes('technical')) {
-                commentStyle = 'analytical';
-            }
-            else {
-                commentStyle = 'friendly'; // Default for adaptive, etc.
-            }
-            console.log(`[YapComment] Style determined from prompt style '${selectedPromptStyle.name}': ${commentStyle}`);
+            // Use style name directly as requested - no mapping logic
+            commentStyle = selectedPromptStyle.name;
+            console.log(`[YapComment] Using style from prompt style name: ${commentStyle}`);
         }
         else {
             // Fallback to settings.commentStyle if no prompt style selected
@@ -150,111 +166,6 @@ function selectRandomPromptStyle(availableStyles) {
     // Fallback to simple random selection
     const randomIndex = Math.floor(Math.random() * availableStyles.length);
     return availableStyles[randomIndex];
-}
-/**
- * Generate comment using Gemini AI with model fallback
- */
-async function generateCommentWithGemini(prompt, apiKey) {
-    try {
-        console.log('[YapComment] Generating comment with Gemini AI...');
-        if (!apiKey || !apiKey.trim()) {
-            console.log('[YapComment] No Gemini API key provided');
-            return null;
-        }
-        // Import GoogleGenerativeAI dynamically
-        let GoogleGenerativeAI;
-        try {
-            GoogleGenerativeAI = require('@google/generative-ai').GoogleGenerativeAI;
-        }
-        catch (importError) {
-            console.error('[YapComment] Failed to import @google/generative-ai:', importError);
-            return null;
-        }
-        const genAI = new GoogleGenerativeAI(apiKey.trim());
-        // Model fallback chain - try models in order
-        const modelChain = [
-            'gemini-flash-latest',
-            'gemini-flash-lite-latest',
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-lite'
-        ];
-        const maxRetries = 3;
-        const retryDelay = 1000;
-        for (const modelName of modelChain) {
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    console.log(`[YapComment] Trying model: ${modelName} (attempt ${attempt}/${maxRetries})`);
-                    const model = genAI.getGenerativeModel({
-                        model: modelName,
-                        generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 1024,
-                        }
-                    });
-                    console.log(`[YapComment] Sending prompt to Gemini (length: ${prompt.length})`);
-                    const result = await model.generateContent(prompt);
-                    console.log(`[YapComment] Received response from Gemini`);
-                    const response = await result.response;
-                    console.log(`[YapComment] Response status: ${response.promptFeedback?.blockReason || 'success'}`);
-                    const comment = response.text().trim();
-                    console.log(`[YapComment] Raw response text: "${comment}"`);
-                    if (comment && comment.length > 0) {
-                        // Clean comment for BMP compatibility (like legacy)
-                        const cleanedComment = cleanCommentForBMP(comment);
-                        console.log(`[YapComment] Generated comment with ${modelName}: "${cleanedComment}"`);
-                        return cleanedComment;
-                    }
-                    // If content is empty, retry
-                    if (attempt < maxRetries) {
-                        console.log(`[YapComment] Empty response from ${modelName}, retrying...`);
-                        await delay(retryDelay * attempt);
-                    }
-                }
-                catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    console.error(`[YapComment] Error with ${modelName} (attempt ${attempt}):`, errorMessage);
-                    // Check if it's a rate limit or overload error
-                    const isRateLimit = errorMessage.includes('503') ||
-                        errorMessage.includes('rate limit') ||
-                        errorMessage.includes('quota') ||
-                        errorMessage.includes('429') ||
-                        errorMessage.includes('overloaded') ||
-                        errorMessage.includes('Service Unavailable');
-                    if (isRateLimit && attempt < maxRetries) {
-                        const waitTime = retryDelay * Math.pow(2, attempt - 1);
-                        console.log(`[YapComment] Rate limit detected, waiting ${waitTime}ms before retry...`);
-                        await delay(waitTime);
-                        continue;
-                    }
-                    // If it's the last attempt for this model, try next model
-                    if (attempt === maxRetries) {
-                        console.log(`[YapComment] Failed all attempts with ${modelName}, trying next model...`);
-                        break;
-                    }
-                    await delay(retryDelay * attempt);
-                }
-            }
-        }
-        console.error(`[YapComment] All models and retry attempts failed`);
-        return null;
-    }
-    catch (error) {
-        console.error(`[YapComment] Unexpected error generating comment with Gemini:`, error);
-        // Log specific error details
-        if (error instanceof Error) {
-            console.error(`[YapComment] Error message: ${error.message}`);
-            console.error(`[YapComment] Error stack: ${error.stack}`);
-        }
-        return null;
-    }
-}
-/**
- * Delay execution helper
- */
-async function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
 /**
  * Clean comment for BMP compatibility and remove formatting

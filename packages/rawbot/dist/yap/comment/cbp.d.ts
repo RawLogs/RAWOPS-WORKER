@@ -7,6 +7,13 @@ export interface YapCommentSettings {
         min: number;
         max: number;
     };
+    profileApiKeys?: {
+        geminiApiKey?: string | null;
+        openaiApiKey?: string | null;
+        deepseekApiKey?: string | null;
+        huggingfaceApiKey?: string | null;
+        apiKeyPriority?: string[];
+    };
     links: string[];
     aiModel?: string;
     aiLanguage?: string;
