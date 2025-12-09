@@ -13,14 +13,19 @@
     "@rawops/rawops": "workspace:*",
     "@rawops/shared": "workspace:*",
     "@rawops/rawai": "workspace:*",
-    "@google/generative-ai": "^0.21.0",
     "axios": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
     "typescript": "^5.9.3"
   },
-  "keywords": ["twitter", "automation", "selenium", "ai", "bot"],
+  "keywords": [
+    "twitter",
+    "automation",
+    "selenium",
+    "ai",
+    "bot"
+  ],
   "author": "RawOps Team",
   "license": "MIT",
   "packageManager": "pnpm@10.9.0"
