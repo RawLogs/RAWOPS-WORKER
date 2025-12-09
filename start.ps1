@@ -9,19 +9,8 @@ Write-Host "Starting RAWOPS-WORKER..." -ForegroundColor Green
 
 # Auto-update logic
 Write-Host "Checking for updates..." -ForegroundColor Cyan
-git fetch origin
-$local = git rev-parse HEAD
-$remote = git rev-parse '@{u}'
-
-if ($local -ne $remote) {
-    Write-Host "New version available. Updating..." -ForegroundColor Yellow
-    $currentBranch = git rev-parse --abbrev-ref HEAD
-    git reset --hard "origin/$currentBranch"
-    git pull
-    Write-Host "Update complete." -ForegroundColor Green
-} else {
-    Write-Host "Already up to date." -ForegroundColor Green
-}
+git reset --hard
+git pull
 
 # Check if node is installed
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue

@@ -11,18 +11,8 @@ echo "Starting RAWOPS-WORKER..."
 # Auto-update via git
 if command -v git >/dev/null 2>&1; then
   echo "Checking for updates..."
-  git fetch origin || true
-  local_rev=$(git rev-parse HEAD 2>/dev/null || echo "")
-  remote_rev=$(git rev-parse '@{u}' 2>/dev/null || echo "")
-  if [[ -n "$local_rev" && -n "$remote_rev" && "$local_rev" != "$remote_rev" ]]; then
-    echo "New version available. Updating..."
-    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-    git reset --hard "origin/$current_branch" || true
-    git pull || true
-    echo "Update complete."
-  else
-    echo "Already up to date."
-  fi
+  git reset --hard
+  git pull
 fi
 
 # Check Node.js

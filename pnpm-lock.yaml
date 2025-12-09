@@ -11,9 +11,6 @@ importers:
       '@google/genai':
         specifier: ^1.31.0
         version: 1.31.0
-      '@google/generative-ai':
-        specifier: ^0.21.0
-        version: 0.21.0
       '@huggingface/inference':
         specifier: ^4.13.4
         version: 4.13.4
@@ -84,9 +81,6 @@ importers:
 
   packages/rawbot:
     dependencies:
-      '@google/generative-ai':
-        specifier: ^0.21.0
-        version: 0.21.0
       '@rawops/rawai':
         specifier: workspace:*
         version: link:../rawai
@@ -151,10 +145,6 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
-
-  '@google/generative-ai@0.21.0':
-    resolution: {integrity: sha512-7XhUbtnlkSEZK15kN3t+tzIMxsbKm/dSkKBFalj+20NvPKe1kBY7mR2P7vuijEn+f06z5+A8bVGKO0v39cr6Wg==}
-    engines: {node: '>=18.0.0'}
 
   '@huggingface/inference@4.13.4':
     resolution: {integrity: sha512-1G6jBDYLAZw7oNrJdMp+0/CafeoNaCLzrDd9fYSX3nhjzMuyWIPZ/MtP5EwXdC0htlFPx+R6JGqPhctAalQO+w==}
@@ -1032,8 +1022,6 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@google/generative-ai@0.21.0': {}
-
   '@huggingface/inference@4.13.4':
     dependencies:
       '@huggingface/jinja': 0.5.3
@@ -1057,7 +1045,6 @@ snapshots:
 
   '@rawops/rawbot@file:packages/rawbot':
     dependencies:
-      '@google/generative-ai': 0.21.0
       '@rawops/rawai': link:packages/rawai
       '@rawops/rawops': link:packages/rawops
       '@rawops/shared': link:packages/shared
