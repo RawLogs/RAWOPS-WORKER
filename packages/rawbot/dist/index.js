@@ -18,7 +18,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.calculateFollowRatio = exports.Drivers = exports.setupBrowser = exports.RawOps = exports.submitCacheToAPI = exports.bulkUpdateLinksStatusAPI = exports.YapGrow = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
+exports.calculateFollowRatio = exports.Drivers = exports.setupBrowser = exports.RawOps = exports.submitCacheToAPI = exports.bulkUpdateLinksStatusAPI = exports.logGrowAiProviderPriority = exports.generateGrowAiComment = exports.buildYapCommentSettingsFromGrow = exports.YapGrow = exports.YapInitManager = exports.CommentByLink = exports.CommentByProfile = exports.DatabaseService = exports.BaseFlow = exports.SearchFlow = exports.FilterService = exports.SearchService = exports.XClient = void 0;
 // Core services exports
 var XClient_1 = require("./client/XClient");
 Object.defineProperty(exports, "XClient", { enumerable: true, get: function () { return XClient_1.XClient; } });
@@ -44,6 +44,10 @@ var YapInitManager_1 = require("./yap/YapInitManager");
 Object.defineProperty(exports, "YapInitManager", { enumerable: true, get: function () { return YapInitManager_1.YapInitManager; } });
 var yg_1 = require("./yap/grow/yg");
 Object.defineProperty(exports, "YapGrow", { enumerable: true, get: function () { return yg_1.YapGrow; } });
+var commentAi_1 = require("./yap/grow/utils/commentAi");
+Object.defineProperty(exports, "buildYapCommentSettingsFromGrow", { enumerable: true, get: function () { return commentAi_1.buildYapCommentSettingsFromGrow; } });
+Object.defineProperty(exports, "generateGrowAiComment", { enumerable: true, get: function () { return commentAi_1.generateGrowAiComment; } });
+Object.defineProperty(exports, "logGrowAiProviderPriority", { enumerable: true, get: function () { return commentAi_1.logGrowAiProviderPriority; } });
 // Cache utilities exports
 var cache_1 = require("./yap/comment/utils/cache");
 Object.defineProperty(exports, "bulkUpdateLinksStatusAPI", { enumerable: true, get: function () { return cache_1.bulkUpdateLinksStatusAPI; } });

@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleScrollAndDetectTweets = handleScrollAndDetectTweets;
 exports.handleScrollAndDetectTweetsByTime = handleScrollAndDetectTweetsByTime;
-const utils_1 = require("../../comment/utils");
+const commentAi_1 = require("../utils/commentAi");
 /**
  * Handle scroll and detect tweets action
  */
@@ -87,27 +87,7 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
             try {
                 const postContent = await drivers.grow.extractPostContent(result.tweet.element);
                 if (postContent?.trim()) {
-                    const commentSettings = {
-                        aiCommentEnabled: settings.aiCommentEnabled,
-                        aiCommentPrompt: settings.aiCommentPrompt || '',
-                        geminiApiKey: settings.geminiApiKey || '',
-                        delayRange: { min: 0, max: 0 },
-                        links: [],
-                        aiModel: settings.aiModel,
-                        aiLanguage: settings.aiLanguage,
-                        commentStyle: settings.commentStyle,
-                        commentLength: settings.commentLength,
-                        includeHashtags: settings.includeHashtags,
-                        maxHashtags: settings.maxHashtags,
-                        includeMentions: settings.includeMentions,
-                        maxMentions: settings.maxMentions,
-                        promptStyleMode: settings.promptStyleMode,
-                        selectedPromptStyles: settings.selectedPromptStyles,
-                        promptStyleCategory: settings.promptStyleCategory,
-                        databasePrompt: settings.databasePrompt,
-                        profileId: settings.profileId
-                    };
-                    const generated = await (0, utils_1.generateCommentWithUserStyles)(postContent.trim(), commentSettings);
+                    const generated = await (0, commentAi_1.generateGrowAiComment)(postContent.trim(), settings);
                     if (generated) {
                         commentText = generated;
                         console.log(`[YapGrow] Generated AI comment: "${commentText.substring(0, 100)}..."`);
@@ -249,27 +229,7 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
             try {
                 const postContent = await drivers.grow.extractPostContent(targetTweet.element);
                 if (postContent?.trim()) {
-                    const commentSettings = {
-                        aiCommentEnabled: settings.aiCommentEnabled,
-                        aiCommentPrompt: settings.aiCommentPrompt || '',
-                        geminiApiKey: settings.geminiApiKey || '',
-                        delayRange: { min: 0, max: 0 },
-                        links: [],
-                        aiModel: settings.aiModel,
-                        aiLanguage: settings.aiLanguage,
-                        commentStyle: settings.commentStyle,
-                        commentLength: settings.commentLength,
-                        includeHashtags: settings.includeHashtags,
-                        maxHashtags: settings.maxHashtags,
-                        includeMentions: settings.includeMentions,
-                        maxMentions: settings.maxMentions,
-                        promptStyleMode: settings.promptStyleMode,
-                        selectedPromptStyles: settings.selectedPromptStyles,
-                        promptStyleCategory: settings.promptStyleCategory,
-                        databasePrompt: settings.databasePrompt,
-                        profileId: settings.profileId
-                    };
-                    const generated = await (0, utils_1.generateCommentWithUserStyles)(postContent.trim(), commentSettings);
+                    const generated = await (0, commentAi_1.generateGrowAiComment)(postContent.trim(), settings);
                     if (generated) {
                         commentText = generated;
                         console.log(`[YapGrow] Generated AI comment: "${commentText.substring(0, 100)}..."`);

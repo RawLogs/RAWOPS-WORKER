@@ -12,3 +12,4 @@ export declare function getDelayValue(delaySetting: DelaySetting): number;
  * Resolve a variable value
  */
 export declare function resolveVariable(varName: string | number, context: FlowContext, getDelayValue: (delaySetting: DelaySetting) => number): any;
+export { buildYapCommentSettingsFromGrow, generateGrowAiComment, logGrowAiProviderPriority } from './commentAi';
