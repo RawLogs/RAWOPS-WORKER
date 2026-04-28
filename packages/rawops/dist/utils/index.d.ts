@@ -3,4 +3,3 @@ export * from './browser-setup';
 export * from './proxy-utils';
 export * from './interaction-utils';
 export * from './wait-utils';
-export * from './datetime-format';

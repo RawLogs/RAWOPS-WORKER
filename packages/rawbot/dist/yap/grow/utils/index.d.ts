@@ -1,4 +1,5 @@
 import { Step, DelaySetting, FlowContext } from '../types';
+export { yapGrowSettingsToCommentAiSettings } from './comment-ai-settings';
 /**
  * Resolve step params (convert step object to params, excluding 'action' and 'ms')
  */
@@ -12,4 +13,3 @@ export declare function getDelayValue(delaySetting: DelaySetting): number;
  * Resolve a variable value
  */
 export declare function resolveVariable(varName: string | number, context: FlowContext, getDelayValue: (delaySetting: DelaySetting) => number): any;
-export { buildYapCommentSettingsFromGrow, generateGrowAiComment, logGrowAiProviderPriority, normalizeGrowSettingsLikeCommentByLink } from './commentAi';

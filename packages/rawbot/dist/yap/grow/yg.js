@@ -41,7 +41,6 @@ const rawai_1 = require("@rawops/rawai");
 const path = __importStar(require("path"));
 const utils_1 = require("../comment/utils");
 const utils_2 = require("./utils");
-const commentAi_1 = require("./utils/commentAi");
 const handlers_1 = require("./handlers");
 /**
  * YapGrow - Automated flow execution based on JSON settings
@@ -96,39 +95,51 @@ class YapGrow {
             if (!this.xClient || !this.drivers) {
                 throw new Error('XClient or Drivers not initialized');
             }
-            // Same key / priority assembly as CommentByLink (cbl.ts) so ContentAI matches yap comment.
-            const aiSettings = (0, commentAi_1.normalizeGrowSettingsLikeCommentByLink)(settings);
-            const hasGeminiKey = !!aiSettings.geminiApiKey;
-            const hasProfileKeys = aiSettings.profileApiKeys && (aiSettings.profileApiKeys.geminiApiKey ||
-                aiSettings.profileApiKeys.openaiApiKey ||
-                aiSettings.profileApiKeys.deepseekApiKey ||
-                aiSettings.profileApiKeys.huggingfaceApiKey);
-            // Same AI init gate as Yap Comment (CommentByLink): keys + flag only — generation uses generateCommentWithUserStyles per call.
+            // Initialize AI if enabled and databasePrompt is available
+            const hasGeminiKey = !!settings.geminiApiKey;
+            const hasProfileKeys = settings.profileApiKeys && (settings.profileApiKeys.geminiApiKey ||
+                settings.profileApiKeys.openaiApiKey ||
+                settings.profileApiKeys.deepseekApiKey ||
+                settings.profileApiKeys.huggingfaceApiKey);
             if (settings.aiCommentEnabled && (hasGeminiKey || hasProfileKeys)) {
-                const aiConfig = {
-                    model: aiSettings.aiModel || 'gemini-flash-latest',
-                    maxRetries: 3,
-                    retryDelay: 2000
-                };
-                const apiKeys = {};
-                if (aiSettings.profileApiKeys) {
-                    apiKeys.gemini = aiSettings.profileApiKeys.geminiApiKey;
-                    apiKeys.openai = aiSettings.profileApiKeys.openaiApiKey;
-                    apiKeys.deepseek = aiSettings.profileApiKeys.deepseekApiKey;
-                    apiKeys.huggingface = aiSettings.profileApiKeys.huggingfaceApiKey;
-                    if (aiSettings.profileApiKeys.apiKeyPriority) {
-                        aiConfig.providerPriority = aiSettings.profileApiKeys.apiKeyPriority;
+                // Validate databasePrompt is available (required by ContentAI)
+                if (!settings.databasePrompt || !settings.databasePrompt.finalPrompt || !settings.databasePrompt.requirePrompt) {
+                    console.error('[YapGrow] ⚠️ AI comment enabled but databasePrompt is missing or incomplete');
+                    console.error('[YapGrow] Disabling AI comments for this run. Please ensure prompt settings are configured.');
+                    settings.aiCommentEnabled = false;
+                }
+                else {
+                    const aiConfig = {
+                        model: settings.aiModel || 'gemini-flash-latest',
+                        maxRetries: 3,
+                        retryDelay: 2000
+                    };
+                    const apiKeys = {};
+                    if (settings.profileApiKeys) {
+                        apiKeys.gemini = settings.profileApiKeys.geminiApiKey;
+                        apiKeys.openai = settings.profileApiKeys.openaiApiKey;
+                        apiKeys.deepseek = settings.profileApiKeys.deepseekApiKey;
+                        apiKeys.huggingface = settings.profileApiKeys.huggingfaceApiKey;
+                        if (settings.profileApiKeys.apiKeyPriority) {
+                            aiConfig.providerPriority = settings.profileApiKeys.apiKeyPriority;
+                        }
                     }
+                    // Map legacy geminiApiKey if not already present
+                    if (settings.geminiApiKey && !apiKeys.gemini) {
+                        apiKeys.gemini = settings.geminiApiKey;
+                    }
+                    aiConfig.apiKeys = apiKeys;
+                    // providerPriority set from profileApiKeys.apiKeyPriority when available;
+                    // otherwise BaseAI default ['openai','gemini','deepseek','huggingface'] applies.
+                    this.contentAI = new rawai_1.ContentAI(aiConfig);
+                    console.log('[YapGrow] AI initialized for comment generation');
+                    console.log(`[YapGrow] Provider priority: ${(aiConfig.providerPriority || ['openai', 'gemini', 'deepseek', 'huggingface']).join(', ')}`);
+                    console.log('[YapGrow] Database prompt available:', {
+                        hasFinalPrompt: !!settings.databasePrompt.finalPrompt,
+                        hasRequirePrompt: !!settings.databasePrompt.requirePrompt,
+                        hasSelectedStyles: !!settings.selectedPromptStyles?.length
+                    });
                 }
-                if (aiSettings.geminiApiKey && !apiKeys.gemini) {
-                    apiKeys.gemini = aiSettings.geminiApiKey;
-                }
-                aiConfig.apiKeys = apiKeys;
-                if (!aiConfig.providerPriority && apiKeys.gemini) {
-                    aiConfig.providerPriority = ['gemini'];
-                }
-                this.contentAI = new rawai_1.ContentAI(aiConfig);
-                console.log('[YapGrow] AI initialized for comment generation (CommentByLink-style keys + providerPriority)');
             }
             // Filter already processed links
             console.log(`[YapGrow] Starting workflow with ${settings.links.length} links`);
@@ -471,7 +482,8 @@ class YapGrow {
             cacheDir: this.cacheDir,
             resolveVariable: (varName) => this.resolveVariable(varName),
             processedLinks,
-            remainingLinksCount
+            remainingLinksCount,
+            contentAI: this.contentAI
         };
     }
     async close() {

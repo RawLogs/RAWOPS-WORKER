@@ -1,6 +1,7 @@
 "use strict";
 // packages/rawbot/src/yap/comment/utils/ai.ts
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildContentAI = buildContentAI;
 exports.generateCommentWithUserStyles = generateCommentWithUserStyles;
 exports.selectRandomPromptStyle = selectRandomPromptStyle;
 exports.cleanCommentForBMP = cleanCommentForBMP;
@@ -8,9 +9,53 @@ exports.generateReplyToComment = generateReplyToComment;
 exports.generateReplyToTweetComment = generateReplyToTweetComment;
 const rawai_1 = require("@rawops/rawai");
 /**
- * Generate comment with user styles using available prompt styles
+ * Build a ContentAI instance from YapCommentSettings.
+ * Same logic as CBP/CBL runYapCommentWorkflow — single source of truth.
  */
-async function generateCommentWithUserStyles(postContent, settings, commentContent, commentUsername) {
+function buildContentAI(settings) {
+    const hasGeminiKey = !!settings.geminiApiKey;
+    const hasProfileKeys = settings.profileApiKeys && (settings.profileApiKeys.geminiApiKey ||
+        settings.profileApiKeys.openaiApiKey ||
+        settings.profileApiKeys.deepseekApiKey ||
+        settings.profileApiKeys.huggingfaceApiKey);
+    if (!hasGeminiKey && !hasProfileKeys) {
+        return null;
+    }
+    const aiConfig = {
+        model: settings.aiModel || 'gemini-flash-latest',
+        maxRetries: 3,
+        retryDelay: 2000
+    };
+    const apiKeys = {};
+    if (settings.profileApiKeys) {
+        apiKeys.gemini = settings.profileApiKeys.geminiApiKey;
+        apiKeys.openai = settings.profileApiKeys.openaiApiKey;
+        apiKeys.deepseek = settings.profileApiKeys.deepseekApiKey;
+        apiKeys.huggingface = settings.profileApiKeys.huggingfaceApiKey;
+        if (settings.profileApiKeys.apiKeyPriority) {
+            aiConfig.providerPriority = settings.profileApiKeys.apiKeyPriority;
+            console.log(`[YapComment] Provider priority: ${settings.profileApiKeys.apiKeyPriority.join(', ')}`);
+        }
+    }
+    if (settings.geminiApiKey && !apiKeys.gemini) {
+        console.log('[YapComment] Mapping legacy Gemini key to multi-provider config');
+        apiKeys.gemini = settings.geminiApiKey;
+    }
+    aiConfig.apiKeys = apiKeys;
+    // providerPriority is either set from profileApiKeys.apiKeyPriority, or left unset
+    // so BaseAI falls back to its default ['openai','gemini','deepseek','huggingface'].
+    // Never force ['gemini'] — that would ignore the user's configured priority.
+    return new rawai_1.ContentAI(aiConfig);
+}
+/**
+ * Generate comment with user styles using available prompt styles.
+ *
+ * Pass `existingAI` (e.g. `this.contentAI` from the workflow class) to reuse the
+ * already-initialised instance — that instance has the correct `providerPriority`
+ * from `profileApiKeys.apiKeyPriority`.  When omitted the function builds a fresh
+ * instance from `settings` (legacy behaviour).
+ */
+async function generateCommentWithUserStyles(postContent, settings, commentContent, commentUsername, existingAI) {
     try {
         console.log('[YapComment] Starting comment generation...');
         console.log(`[YapComment] Post content length: ${postContent.length}`);
@@ -27,7 +72,7 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
             settings.profileApiKeys.openaiApiKey ||
             settings.profileApiKeys.deepseekApiKey ||
             settings.profileApiKeys.huggingfaceApiKey);
-        if (!hasGeminiKey && !hasProfileKeys) {
+        if (!hasGeminiKey && !hasProfileKeys && !existingAI) {
             console.log('[YapComment] No API keys provided (Gemini or Profile Keys)');
             return null;
         }
@@ -41,7 +86,6 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
         }
         // Priority 2: Use selected prompt styles from prompt settings
         else if (settings.selectedPromptStyles && settings.selectedPromptStyles.length > 0) {
-            // Use selectedPromptStyles directly from prompt settings (already contains full data)
             const stylesToUse = settings.selectedPromptStyles;
             if (stylesToUse.length > 0) {
                 selectedPromptStyle = selectRandomPromptStyle(stylesToUse);
@@ -53,20 +97,14 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
         }
         // Priority 3: Use selected prompt styles from availablePromptStyles (fallback)
         else if (settings.availablePromptStyles && settings.availablePromptStyles.length > 0) {
-            // Filter availablePromptStyles based on selectedPromptStyles IDs
             let stylesToUse = settings.availablePromptStyles;
-            // Note: This fallback assumes selectedPromptStyles is still string[] for backward compatibility
-            // In the new system, selectedPromptStyles should be full objects from prompt settings
             if (settings.selectedPromptStyles && settings.selectedPromptStyles.length > 0) {
-                // Check if selectedPromptStyles contains objects or strings
                 const firstItem = settings.selectedPromptStyles[0];
                 if (typeof firstItem === 'string') {
-                    // Legacy string array - filter by IDs
                     const stringArray = settings.selectedPromptStyles;
                     stylesToUse = settings.availablePromptStyles.filter(style => stringArray.includes(style.id));
                 }
                 else {
-                    // New object array - use directly (should not reach here due to Priority 2)
                     stylesToUse = settings.selectedPromptStyles;
                 }
             }
@@ -78,37 +116,9 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
                 }
             }
         }
-        // Initialize ContentAI with multi-provider config
-        const aiConfig = {
-            model: settings.aiModel || 'gemini-flash-latest'
-        };
-        if (settings.profileApiKeys) {
-            console.log('[YapComment] Using multi-provider AI config');
-            aiConfig.apiKeys = {
-                gemini: settings.profileApiKeys.geminiApiKey,
-                openai: settings.profileApiKeys.openaiApiKey,
-                deepseek: settings.profileApiKeys.deepseekApiKey,
-                huggingface: settings.profileApiKeys.huggingfaceApiKey
-            };
-            if (settings.profileApiKeys.apiKeyPriority) {
-                aiConfig.providerPriority = settings.profileApiKeys.apiKeyPriority;
-                console.log(`[YapComment] Provider priority: ${settings.profileApiKeys.apiKeyPriority.join(', ')}`);
-            }
-        }
-        else {
-            // Initialize empty apiKeys object if no profileApiKeys
-            aiConfig.apiKeys = {};
-        }
-        // Map legacy geminiApiKey if not already present
-        if (settings.geminiApiKey && !aiConfig.apiKeys.gemini) {
-            console.log('[YapComment] Mapping legacy Gemini key to multi-provider config');
-            aiConfig.apiKeys.gemini = settings.geminiApiKey;
-        }
-        // Ensure we have at least one provider if priority list is empty or missing
-        if (!aiConfig.providerPriority && aiConfig.apiKeys.gemini) {
-            aiConfig.providerPriority = ['gemini'];
-        }
-        const contentAI = new rawai_1.ContentAI(aiConfig);
+        // Use pre-initialised ContentAI when available (carries correct providerPriority)
+        // otherwise build a fresh one from settings.
+        const contentAI = existingAI ?? buildContentAI(settings);
         console.log(`[YapComment] Prioritizing provider: ${contentAI.providerName}`);
         // Determine style from selectedPromptStyle or fallback to settings
         let commentStyle = 'friendly'; // Default fallback

@@ -424,22 +424,12 @@ class ScrollOps extends base_1.BaseOps {
             const cellInnerDiv = tweet.closest('[data-testid="cellInnerDiv"]');
             if (!cellInnerDiv) return;
             
-            // Prefer permalink row: <a href="/user/status/id">…<time datetime>…</time></a>
-            let linkElement = null;
-            let href = null;
-            const statusLinks = tweet.querySelectorAll('a[href*="/status/"]');
-            for (const link of statusLinks) {
-              if (link.querySelector('time[datetime]')) {
-                linkElement = link;
-                href = link.getAttribute('href');
-                break;
-              }
-            }
-            if (!linkElement && statusLinks.length > 0) {
-              linkElement = statusLinks[0];
-              href = linkElement.getAttribute('href');
-            }
-            if (!linkElement || !href) return;
+            // Extract tweet link
+            const linkElement = tweet.querySelector('a[href*="/status/"]');
+            if (!linkElement) return;
+            
+            const href = linkElement.getAttribute('href');
+            if (!href) return;
             
             // Extract status ID
             const statusMatch = href.match(/\\/status\\/(\\d+)/);
@@ -459,6 +449,7 @@ class ScrollOps extends base_1.BaseOps {
               
               // Method 2: Find time element within status link
               if (!timestamp) {
+                const statusLinks = tweet.querySelectorAll('a[href*="/status/"]');
                 for (const link of statusLinks) {
                   timeElement = link.querySelector('time[datetime]');
                   if (timeElement) {

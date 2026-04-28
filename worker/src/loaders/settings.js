@@ -6,58 +6,6 @@ exports.loadUserGrowSettings = loadUserGrowSettings;
 exports.loadUserProjectSettings = loadUserProjectSettings;
 exports.loadProjectSettingsFromRules = loadProjectSettingsFromRules;
 const api_keys_1 = require("./api-keys");
-const DEFAULT_PROVIDER_PRIORITY = ['gemini', 'openai', 'deepseek', 'huggingface'];
-function pickNonEmptyKey(...vals) {
-    for (const v of vals) {
-        if (v == null)
-            continue;
-        if (typeof v !== 'string')
-            continue;
-        const t = v.trim();
-        if (t.length > 0)
-            return t;
-    }
-    return null;
-}
-/**
- * Merge decrypted profileApiKeys from grow-settings and comment-settings (per-field, prefer first non-empty).
- * Avoids replacing the whole object with a comment payload that omits OpenAI while grow-settings has it.
- */
-function mergeGrowProfileApiKeys(growPk, commentPk, rootGemini) {
-    const g = growPk && typeof growPk === 'object' ? growPk : {};
-    const c = commentPk && typeof commentPk === 'object' ? commentPk : {};
-    const geminiApiKey = pickNonEmptyKey(c.geminiApiKey, g.geminiApiKey, rootGemini);
-    const openaiApiKey = pickNonEmptyKey(c.openaiApiKey, g.openaiApiKey);
-    const deepseekApiKey = pickNonEmptyKey(c.deepseekApiKey, g.deepseekApiKey);
-    const huggingfaceApiKey = pickNonEmptyKey(c.huggingfaceApiKey, g.huggingfaceApiKey);
-    const has = {
-        gemini: !!geminiApiKey,
-        openai: !!openaiApiKey,
-        deepseek: !!deepseekApiKey,
-        huggingface: !!huggingfaceApiKey
-    };
-    if (!has.gemini && !has.openai && !has.deepseek && !has.huggingface) {
-        return null;
-    }
-    const rawPri = Array.isArray(c.apiKeyPriority) && c.apiKeyPriority.length > 0
-        ? c.apiKeyPriority
-        : Array.isArray(g.apiKeyPriority) && g.apiKeyPriority.length > 0
-            ? g.apiKeyPriority
-            : null;
-    let apiKeyPriority = rawPri && rawPri.length > 0
-        ? rawPri.filter((p) => has[p])
-        : [...DEFAULT_PROVIDER_PRIORITY].filter((p) => has[p]);
-    if (apiKeyPriority.length === 0 && has.gemini) {
-        apiKeyPriority = ['gemini'];
-    }
-    return {
-        geminiApiKey: geminiApiKey ?? null,
-        openaiApiKey: openaiApiKey ?? null,
-        deepseekApiKey: deepseekApiKey ?? null,
-        huggingfaceApiKey: huggingfaceApiKey ?? null,
-        apiKeyPriority
-    };
-}
 /**
  * Load user-specific comment settings
  * Throws error if API calls fail - ensures settings are loaded before initializing rawbot services
@@ -71,24 +19,46 @@ async function loadUserCommentSettings(profileId, userId, apiService) {
             throw new Error(`Failed to load comment settings from API for profile ${profileId}`);
         }
         console.log(`[Worker] ✅ Comment settings loaded from API for profile ${profileId}`);
-        // Get Gemini API key if userId is provided and AI is enabled
+        // Ensure top-level geminiApiKey is populated for backward compat with rawbot.
+        // Priority: 1) already set  2) profileApiKeys.geminiApiKey  3) legacy endpoint
+        const hasProfileAiKey = userSettings.profileApiKeys && (userSettings.profileApiKeys.geminiApiKey ||
+            userSettings.profileApiKeys.openaiApiKey ||
+            userSettings.profileApiKeys.deepseekApiKey ||
+            userSettings.profileApiKeys.huggingfaceApiKey);
         if (userId && userSettings.aiCommentEnabled && !userSettings.geminiApiKey) {
-            try {
-                const geminiApiKey = await (0, api_keys_1.getGeminiApiKey)(userId, apiService);
-                if (geminiApiKey) {
-                    userSettings.geminiApiKey = geminiApiKey;
-                    console.log(`[Worker] ✅ Gemini API key added to settings`);
+            if (userSettings.profileApiKeys?.geminiApiKey) {
+                // Backfill from profile keys so old rawbot dist still finds a geminiApiKey
+                userSettings.geminiApiKey = userSettings.profileApiKeys.geminiApiKey;
+                const priority = userSettings.profileApiKeys?.apiKeyPriority;
+                console.log(`[Worker] ✅ Gemini API key mapped from profile keys (priority: ${priority ? priority.join(', ') : 'default'})`);
+            }
+            else if (!hasProfileAiKey) {
+                // No profile keys at all — try legacy single-key endpoint
+                try {
+                    const geminiApiKey = await (0, api_keys_1.getGeminiApiKey)(userId, apiService);
+                    if (geminiApiKey) {
+                        userSettings.geminiApiKey = geminiApiKey;
+                        console.log(`[Worker] ✅ Gemini API key added to settings`);
+                    }
+                    else {
+                        console.log(`[Worker] ⚠️ No Gemini API key found, AI comments will be disabled`);
+                        userSettings.aiCommentEnabled = false;
+                    }
                 }
-                else {
-                    console.log(`[Worker] ⚠️ No Gemini API key found, AI comments will be disabled`);
-                    userSettings.aiCommentEnabled = false;
+                catch (error) {
+                    console.error(`[Worker] ❌ Failed to load API key after retries:`, error);
+                    throw new Error(`Failed to load API key: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
-            catch (error) {
-                // If API call failed after retries, rethrow to stop worker
-                console.error(`[Worker] ❌ Failed to load API key after retries:`, error);
-                throw new Error(`Failed to load API key: ${error instanceof Error ? error.message : String(error)}`);
+            else {
+                // Has profile keys (openai/deepseek/huggingface) but no gemini — new rawbot handles this
+                const priority = userSettings.profileApiKeys?.apiKeyPriority;
+                console.log(`[Worker] ✅ Using profile API keys without Gemini (priority: ${priority ? priority.join(', ') : 'default'})`);
             }
+        }
+        else if (userSettings.geminiApiKey) {
+            const priority = userSettings.profileApiKeys?.apiKeyPriority;
+            console.log(`[Worker] ✅ Gemini API key available (priority: ${priority ? priority.join(', ') : 'default'})`);
         }
         // Get prompt settings from database if AI is enabled
         if (userSettings.aiCommentEnabled) {
@@ -151,67 +121,54 @@ async function loadUserGrowSettings(profileId, userId, apiService) {
             throw new Error(`Failed to load grow settings from API for profile ${profileId}`);
         }
         console.log(`[Worker] ✅ Grow settings loaded from API for profile ${profileId}`);
-        // When AI is on: merge decrypted keys from grow-settings + comment-settings (same DB row as cbl).
-        // Per-field merge so a sparse comment-settings payload cannot wipe OpenAI from grow-settings.
-        if (userSettings.aiCommentEnabled) {
-            try {
-                const commentSettings = await apiService.getUserCommentSettings(profileId);
-                const merged = mergeGrowProfileApiKeys(userSettings.profileApiKeys, commentSettings?.profileApiKeys, userSettings.geminiApiKey);
-                if (merged) {
-                    userSettings.profileApiKeys = merged;
-                    console.log('[Worker] Merged profileApiKeys (grow + comment-settings)', {
-                        hasGemini: !!merged.geminiApiKey,
-                        hasOpenai: !!merged.openaiApiKey,
-                        hasDeepseek: !!merged.deepseekApiKey,
-                        hasHuggingface: !!merged.huggingfaceApiKey,
-                        apiKeyPriority: merged.apiKeyPriority
-                    });
-                }
-            }
-            catch (mergeErr) {
-                console.warn('[Worker] Could not load comment-settings for profileApiKeys merge:', mergeErr);
-            }
-        }
-        // Get Gemini API key if userId is provided and AI is enabled
+        // Ensure top-level geminiApiKey is populated for backward compat with rawbot.
+        // Priority: 1) already set  2) profileApiKeys.geminiApiKey  3) legacy endpoint
+        const hasGrowProfileAiKey = userSettings.profileApiKeys && (userSettings.profileApiKeys.geminiApiKey ||
+            userSettings.profileApiKeys.openaiApiKey ||
+            userSettings.profileApiKeys.deepseekApiKey ||
+            userSettings.profileApiKeys.huggingfaceApiKey);
         if (userId && userSettings.aiCommentEnabled && !userSettings.geminiApiKey) {
-            console.log(`[Worker] Fetching Gemini API key for AI comment generation...`);
-            try {
-                const geminiApiKey = await (0, api_keys_1.getGeminiApiKey)(userId, apiService);
-                if (geminiApiKey) {
-                    userSettings.geminiApiKey = geminiApiKey;
-                    console.log(`[Worker] ✅ Gemini API key added to settings`);
+            if (userSettings.profileApiKeys?.geminiApiKey) {
+                // Backfill from profile keys so old rawbot dist still finds a geminiApiKey
+                userSettings.geminiApiKey = userSettings.profileApiKeys.geminiApiKey;
+                const priority = userSettings.profileApiKeys?.apiKeyPriority;
+                console.log(`[Worker] ✅ Gemini API key mapped from profile keys for GROW (priority: ${priority ? priority.join(', ') : 'default'})`);
+            }
+            else if (!hasGrowProfileAiKey) {
+                // No profile keys at all — try legacy single-key endpoint
+                console.log(`[Worker] Fetching Gemini API key for AI comment generation...`);
+                try {
+                    const geminiApiKey = await (0, api_keys_1.getGeminiApiKey)(userId, apiService);
+                    if (geminiApiKey) {
+                        userSettings.geminiApiKey = geminiApiKey;
+                        console.log(`[Worker] ✅ Gemini API key added to settings`);
+                    }
+                    else {
+                        console.log(`[Worker] ⚠️ No Gemini API key found, AI comments will be disabled`);
+                        userSettings.aiCommentEnabled = false;
+                    }
                 }
-                else {
-                    console.log(`[Worker] ⚠️ No Gemini API key found, AI comments will be disabled`);
-                    userSettings.aiCommentEnabled = false;
+                catch (error) {
+                    console.error(`[Worker] ❌ Failed to load API key after retries:`, error);
+                    throw new Error(`Failed to load API key: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
-            catch (error) {
-                // If API call failed after retries, rethrow to stop worker
-                console.error(`[Worker] ❌ Failed to load API key after retries:`, error);
-                throw new Error(`Failed to load API key: ${error instanceof Error ? error.message : String(error)}`);
+            else {
+                // Has profile keys (openai/deepseek/huggingface) but no gemini — new rawbot handles this
+                const priority = userSettings.profileApiKeys?.apiKeyPriority;
+                console.log(`[Worker] ✅ Using profile API keys for GROW without Gemini (priority: ${priority ? priority.join(', ') : 'default'})`);
             }
         }
-        // If comment-settings failed or returned no keys, map root gemini into profileApiKeys for ContentAI.
-        if (userSettings.aiCommentEnabled && userSettings.geminiApiKey) {
-            const mergedPk = userSettings.profileApiKeys;
-            const stillEmpty = !(mergedPk?.geminiApiKey ||
-                mergedPk?.openaiApiKey ||
-                mergedPk?.deepseekApiKey ||
-                mergedPk?.huggingfaceApiKey);
-            if (stillEmpty) {
-                userSettings.profileApiKeys = {
-                    geminiApiKey: userSettings.geminiApiKey,
-                    apiKeyPriority: ['gemini']
-                };
-                console.log('[Worker] Normalized profileApiKeys from root geminiApiKey (fallback)');
-            }
+        else if (userSettings.geminiApiKey) {
+            const priority = userSettings.profileApiKeys?.apiKeyPriority;
+            console.log(`[Worker] ✅ Gemini API key available for GROW (priority: ${priority ? priority.join(', ') : 'default'})`);
         }
-        // Get prompt settings from database if AI is enabled (same type as Yap Comment / loadUserCommentSettings)
+        // Get prompt settings from database if AI is enabled
+        // Note: GROW uses COMMENT prompt settings since both use AI comment generation
         if (userSettings.aiCommentEnabled) {
-            console.log(`[Worker] Fetching prompt settings from database (type=COMMENT, same as Yap Comment)...`);
+            console.log(`[Worker] Fetching prompt settings from database (using GROW type)...`);
             try {
-                const promptSettings = await apiService.getUserPromptSettings(profileId, 'COMMENT');
+                const promptSettings = await apiService.getUserPromptSettings(profileId, 'GROW');
                 console.log(`[Worker] Prompt settings response:`, {
                     hasPromptSettings: !!promptSettings,
                     hasFinalPrompt: !!(promptSettings?.finalPrompt),
@@ -231,12 +188,12 @@ async function loadUserGrowSettings(profileId, userId, apiService) {
                         userSettings.selectedPromptStyles = promptSettings.selectedPromptStyles;
                         console.log(`[Worker] ✅ Selected prompt styles loaded: ${promptSettings.selectedPromptStyles.length} styles`);
                     }
-                    console.log(`[Worker] ✅ Database prompt loaded successfully for GROW (COMMENT prompt row)`);
+                    console.log(`[Worker] ✅ Database prompt loaded successfully for GROW`);
                 }
                 else {
                     console.error(`[Worker] ❌ No database prompt found or incomplete. AI comments will be disabled.`);
                     console.error(`[Worker] Prompt settings:`, JSON.stringify(promptSettings, null, 2));
-                    console.error(`[Worker] Please ensure prompt_final has a record with type='COMMENT' for this profile.`);
+                    console.error(`[Worker] Please ensure prompt_final table has a record with type='COMMENT' for this profile.`);
                     userSettings.aiCommentEnabled = false;
                     userSettings.databasePrompt = null;
                 }

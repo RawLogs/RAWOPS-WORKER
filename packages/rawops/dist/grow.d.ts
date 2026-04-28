@@ -33,18 +33,6 @@ export interface ScrollAndDetectTweetsByTimeResult {
 export declare class GrowOps extends BaseOps {
     constructor(driver: WebDriver);
     /**
-     * Parse status / snowflake id from tweet href (relative or absolute, web status URLs).
-     */
-    parseStatusIdFromTweetHref(link: string | null | undefined): string | null;
-    /**
-     * Approximate tweet time from X snowflake id when <time datetime> is missing.
-     */
-    approximateUtcDateFromStatusSnowflake(statusId: string | null | undefined): Date | null;
-    /**
-     * Scroll profile / home primary column to top so the first paint is latest tweets (not mid-timeline after random scroll).
-     */
-    scrollPrimaryTimelineToTop(): Promise<void>;
-    /**
      * Parse X/Twitter URL to extract profile URL and status ID
      * Normalizes URLs to x.com format
      */
@@ -103,51 +91,22 @@ export declare class GrowOps extends BaseOps {
         timestamp?: string | null;
     }>, timeFilterHours: number): Promise<FilteredTweet[]>;
     /**
-     * Read <time datetime> for a status id from the live DOM (permalink row: <a href=".../status/id"><time>…</time></a>).
+     * Resolve status id from explicit value or permalink in link.
      */
-    extractTweetTimestampFromPageByStatusId(statusId: string): Promise<Date | null>;
+    private resolveStatusIdForTweet;
     /**
-     * Read tweet body from the live DOM by status id (no WebElement from an earlier scroll).
-     * Avoids StaleElementReference after timeline re-renders.
-     * Uses (1) status links under the page and (2) the first 20 [data-testid="cellInnerDiv"] rows
-     * (X timeline layout; see RAWOPS-AI/.html) so text is resolved from the live DOM only.
+     * Read tweet body from the live DOM by status id only (no WebElement).
+     * Matches X layout: cellInnerDiv → article[data-testid="tweet"] → [data-testid="tweetText"].
+     * Avoids StaleElementReferenceError after virtualized list recycle / scroll.
      */
-    extractPostContentFromPageByStatusId(statusId: string): Promise<string | null>;
+    extractPostContentByStatusId(statusId: string): Promise<string | null>;
     /**
-     * Scroll the tweet with this status id into view (DOM query only).
+     * Extract post content from a tweet. Prefer status id / link (DOM query in page — no stale
+     * element); fall back to WebElement with retries and re-find on stale.
      */
-    scrollToTweetByStatusId(statusId: string): Promise<InteractionResult>;
-    /**
-     * Re-resolve tweet WebElements after scroll/virtualization (same status id).
-     */
-    refreshTweetElementsByStatusId(statusId: string): Promise<{
-        element: any;
-        cellInnerDiv: any;
-        link: string;
-        statusId: string;
-    } | null>;
-    /**
-     * Scroll into view and replace possibly-stale element handles before like/comment/extract.
-     */
-    ensureFreshTweetRefsForInteraction(tweet: {
-        element: any;
-        link: string;
-        statusId: string | null;
-        cellInnerDiv: any;
-    }): Promise<typeof tweet>;
-    /**
-     * Extract post text using only link / status id (no WebElement — avoids stale after virtualization).
-     */
-    extractPostContentByMeta(meta: {
-        link: string;
+    extractPostContent(tweetElement: any, meta?: {
         statusId?: string | null;
-    }): Promise<string | null>;
-    /**
-     * Legacy signature: WebElement is ignored — only link/statusId (avoids StaleElementReference entirely).
-     */
-    extractPostContent(_tweetElement: any, meta?: {
-        link?: string;
-        statusId?: string | null;
+        link?: string | null;
     }): Promise<string | null>;
     /**
      * Scroll to tweet element

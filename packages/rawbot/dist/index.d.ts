@@ -12,7 +12,7 @@ export { CommentByLink } from './yap/comment/cbl';
 export { YapInitManager, YapProfile, YapInitConfig } from './yap/YapInitManager';
 export { YapGrow } from './yap/grow/yg';
 export type { YapGrowSettings, YapGrowResult, Step, FlowContext, DelaySetting } from './yap/grow/types';
-export { buildYapCommentSettingsFromGrow, generateGrowAiComment, logGrowAiProviderPriority } from './yap/grow/utils/commentAi';
+export { yapGrowSettingsToCommentAiSettings } from './yap/grow/utils';
 export { bulkUpdateLinksStatusAPI, submitCacheToAPI } from './yap/comment/utils/cache';
 export { RawOps, setupBrowser } from '@rawops/rawops';
 export type { ProxyConfig } from '@rawops/rawops';

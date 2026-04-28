@@ -1,10 +1,12 @@
 "use strict";
 // packages/rawbot/src/yap/grow/utils/index.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeGrowSettingsLikeCommentByLink = exports.logGrowAiProviderPriority = exports.generateGrowAiComment = exports.buildYapCommentSettingsFromGrow = void 0;
+exports.yapGrowSettingsToCommentAiSettings = void 0;
 exports.resolveStepParams = resolveStepParams;
 exports.getDelayValue = getDelayValue;
 exports.resolveVariable = resolveVariable;
+var comment_ai_settings_1 = require("./comment-ai-settings");
+Object.defineProperty(exports, "yapGrowSettingsToCommentAiSettings", { enumerable: true, get: function () { return comment_ai_settings_1.yapGrowSettingsToCommentAiSettings; } });
 /**
  * Resolve step params (convert step object to params, excluding 'action' and 'ms')
  */
@@ -64,8 +66,3 @@ function resolveVariable(varName, context, getDelayValue) {
     }
     return varName;
 }
-var commentAi_1 = require("./commentAi");
-Object.defineProperty(exports, "buildYapCommentSettingsFromGrow", { enumerable: true, get: function () { return commentAi_1.buildYapCommentSettingsFromGrow; } });
-Object.defineProperty(exports, "generateGrowAiComment", { enumerable: true, get: function () { return commentAi_1.generateGrowAiComment; } });
-Object.defineProperty(exports, "logGrowAiProviderPriority", { enumerable: true, get: function () { return commentAi_1.logGrowAiProviderPriority; } });
-Object.defineProperty(exports, "normalizeGrowSettingsLikeCommentByLink", { enumerable: true, get: function () { return commentAi_1.normalizeGrowSettingsLikeCommentByLink; } });

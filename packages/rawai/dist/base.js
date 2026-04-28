@@ -71,8 +71,9 @@ class BaseAI {
      * Generate content with retry logic and provider fallback
      */
     async generateWithRetry(prompt, customModelChain) {
-        const priorityList = this.config.providerPriority || [];
-        // Add any providers not in priority list to the end
+        // Copy priority list so we never mutate this.config.providerPriority
+        const priorityList = [...(this.config.providerPriority || [])];
+        // Append any initialised providers not already in the priority list
         for (const type of this.providers.keys()) {
             if (!priorityList.includes(type)) {
                 priorityList.push(type);

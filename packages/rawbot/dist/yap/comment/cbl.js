@@ -133,12 +133,11 @@ class CommentByLink {
                     apiKeys.gemini = settings.geminiApiKey;
                 }
                 aiConfig.apiKeys = apiKeys;
-                // Ensure we have at least one provider if priority list is empty or missing
-                if (!aiConfig.providerPriority && apiKeys.gemini) {
-                    aiConfig.providerPriority = ['gemini'];
-                }
+                // providerPriority set from profileApiKeys.apiKeyPriority when available;
+                // otherwise BaseAI default ['openai','gemini','deepseek','huggingface'] applies.
                 this.contentAI = new rawai_1.ContentAI(aiConfig);
                 console.log('[YapComment] AI initialized for comment generation');
+                console.log(`[YapComment] Provider priority: ${(aiConfig.providerPriority || ['openai', 'gemini', 'deepseek', 'huggingface']).join(', ')}`);
             }
             // Process each link
             for (let i = 0; i < filteredLinks.length; i++) {
@@ -345,7 +344,7 @@ class CommentByLink {
                     if (otherUserTweetAnalysis.hasOtherUserTweet && otherUserTweetAnalysis.lastTweetContent) {
                         console.log('[YapComment] Found tweet from other user - will reply to that tweet');
                         // Generate reply to the tweet using generateCommentWithUserStyles
-                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, otherUserTweetAnalysis.lastTweetContent, otherUserTweetAnalysis.lastTweetUsername || 'unknown');
+                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, otherUserTweetAnalysis.lastTweetContent, otherUserTweetAnalysis.lastTweetUsername || 'unknown', this.contentAI);
                         if (commentText) {
                             console.log(`[YapComment] Generated reply to comment: "${commentText}"`);
                             console.log('[YapComment] Posting reply to comment...');
@@ -392,7 +391,7 @@ class CommentByLink {
                     else {
                         console.log('[YapComment] No tweet from other users found - commenting on main tweet');
                         // Generate comment for main tweet
-                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings);
+                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, undefined, undefined, this.contentAI);
                         if (commentText) {
                             console.log(`[YapComment] Generated comment: "${commentText}"`);
                             console.log('[YapComment] Posting comment...');

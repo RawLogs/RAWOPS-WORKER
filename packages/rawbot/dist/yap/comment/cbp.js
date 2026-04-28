@@ -137,12 +137,11 @@ class CommentByProfile {
                     apiKeys.gemini = settings.geminiApiKey;
                 }
                 aiConfig.apiKeys = apiKeys;
-                // Ensure we have at least one provider if priority list is empty or missing
-                if (!aiConfig.providerPriority && apiKeys.gemini) {
-                    aiConfig.providerPriority = ['gemini'];
-                }
+                // providerPriority set from profileApiKeys.apiKeyPriority when available;
+                // otherwise BaseAI default ['openai','gemini','deepseek','huggingface'] applies.
                 this.contentAI = new rawai_1.ContentAI(aiConfig);
                 console.log('[YapComment] AI initialized for comment generation');
+                console.log(`[YapComment] Provider priority: ${(aiConfig.providerPriority || ['openai', 'gemini', 'deepseek', 'huggingface']).join(', ')}`);
             }
             // Step 1: Navigate to Home and perform Random Anti-detect
             console.log('[YapComment] Step 1: Navigating to Home and performing Random Anti-detect...');
@@ -498,7 +497,7 @@ class CommentByProfile {
                         debugMode: false
                     }) || '';
                     if (postContent && settings.aiCommentEnabled) {
-                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings);
+                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, undefined, undefined, this.contentAI);
                         if (commentText) {
                             console.log(`[YapComment] Generated comment: "${commentText}"`);
                             console.log(`[YapComment] Using commentOnFirstTweet to post comment...`);
@@ -715,7 +714,7 @@ class CommentByProfile {
             if (postContent) {
                 try {
                     console.log('[YapComment] Generating AI comment...');
-                    const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings);
+                    const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, undefined, undefined, this.contentAI);
                     if (commentText) {
                         console.log(`[YapComment] Generated comment: "${commentText}"`);
                         console.log('[YapComment] Posting comment...');
