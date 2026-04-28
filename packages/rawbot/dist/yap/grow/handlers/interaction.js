@@ -36,7 +36,40 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleScrollAndDetectTweets = handleScrollAndDetectTweets;
 exports.handleScrollAndDetectTweetsByTime = handleScrollAndDetectTweetsByTime;
+const rawops_1 = require("@rawops/rawops");
 const commentAi_1 = require("../utils/commentAi");
+/** Pick newest tweet by HTML time tag (ISO string from ScrollOps). */
+function selectNewestTweetFromDetected(tweets) {
+    if (!tweets.length)
+        return null;
+    const ranked = [...tweets].sort((a, b) => {
+        const ta = a.timestamp ? new Date(a.timestamp).getTime() : NaN;
+        const tb = b.timestamp ? new Date(b.timestamp).getTime() : NaN;
+        if (!Number.isNaN(ta) && !Number.isNaN(tb))
+            return tb - ta;
+        if (!Number.isNaN(ta))
+            return -1;
+        if (!Number.isNaN(tb))
+            return 1;
+        return 0;
+    });
+    return ranked[0];
+}
+/**
+ * Status ID for ScrollOps: only anchor to a tweet when explicitly requested.
+ * scroll_and_detect_by_time defaults to null — collect timeline then pick newest in time window (not by URL ID).
+ */
+function resolveScrollTargetStatusIdForGrow(params, context, drivers) {
+    const explicit = params.target_status_id ?? params.targetStatusId ?? null;
+    if (explicit)
+        return explicit;
+    const useLinkStatus = params.use_status_from_link === true ||
+        params.match_url_status === true;
+    if (useLinkStatus && drivers) {
+        return drivers.grow.extractStatusId({ params, context });
+    }
+    return null;
+}
 /**
  * Handle scroll and detect tweets action
  */
@@ -44,6 +77,7 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
     const { drivers, context } = handlerContext;
     if (!drivers)
         return;
+    const scrollTimelineTopFirst = params.scroll_timeline_top !== false && params.scrollTimelineTop !== false;
     const maxScrollSteps = params.max_scrolls || params.maxScrolls || 5;
     const detectLimit = params.detect_limit || params.detectLimit || 10;
     // Evaluate interaction rules if settings are provided
@@ -65,9 +99,11 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
             ruleReason = ruleReason ? `${ruleReason}; Comment: ${rulesEvaluation.comment.reason}` : `Comment: ${rulesEvaluation.comment.reason}`;
         }
     }
-    // Extract status ID using GrowOps
-    const statusId = drivers.grow.extractStatusId({ params, context });
-    // Scroll and detect tweets using ScrollOps
+    if (scrollTimelineTopFirst) {
+        await drivers.grow.scrollPrimaryTimelineToTop();
+        await new Promise((r) => setTimeout(r, 500));
+    }
+    const statusId = resolveScrollTargetStatusIdForGrow(params, context, drivers);
     const result = await drivers.scroll.scrollAndDetectTweets(statusId, {
         maxScrollSteps,
         detectLimit,
@@ -75,17 +111,23 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
         scrollDelay: 3000
     });
     context.detected_tweets = result.detectedTweets;
+    // Without a target status ID, ScrollOps does not set result.tweet — choose newest detected by time
+    const tweet = result.tweet ??
+        (!statusId && result.detectedTweets.length > 0
+            ? selectNewestTweetFromDetected(result.detectedTweets)
+            : null);
     // Process interaction if tweet found and actions enabled
-    if (result.tweet && (enableLike || enableComment)) {
-        context.detected_target_tweet = result.tweet;
-        // Scroll to tweet and extract content using GrowOps
-        await drivers.grow.scrollToTweet(result.tweet.cellInnerDiv);
+    if (tweet && (enableLike || enableComment)) {
+        const workingTweet = await drivers.grow.ensureFreshTweetRefsForInteraction(tweet);
+        context.detected_target_tweet = workingTweet;
         // Generate AI comment if enabled (rawbot-specific business logic)
         let commentText = undefined;
-        if (enableComment && settings?.aiCommentEnabled &&
-            settings.databasePrompt?.finalPrompt && settings.databasePrompt?.requirePrompt) {
+        if (enableComment && settings?.aiCommentEnabled) {
             try {
-                const postContent = await drivers.grow.extractPostContent(result.tweet.element);
+                const postContent = await drivers.grow.extractPostContentByMeta({
+                    link: workingTweet.link,
+                    statusId: workingTweet.statusId
+                });
                 if (postContent?.trim()) {
                     const generated = await (0, commentAi_1.generateGrowAiComment)(postContent.trim(), settings);
                     if (generated) {
@@ -100,10 +142,10 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
         }
         // Process interaction using CommentOps from rawops
         const interactionResult = await drivers.comment.processTweetInteraction({
-            element: result.tweet.element,
-            link: result.tweet.link,
-            statusId: result.tweet.statusId,
-            cellInnerDiv: result.tweet.cellInnerDiv
+            element: workingTweet.element,
+            link: workingTweet.link,
+            statusId: workingTweet.statusId,
+            cellInnerDiv: workingTweet.cellInnerDiv
         }, {
             enableLike,
             enableComment,
@@ -145,8 +187,9 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
     const { drivers, context } = handlerContext;
     if (!drivers)
         return;
-    const maxScrollSteps = params.max_scrolls || params.maxScrolls || 5;
-    const detectLimit = params.detect_limit || params.detectLimit || 10;
+    const scrollTimelineTopFirst = params.scroll_timeline_top !== false && params.scrollTimelineTop !== false;
+    const maxScrollSteps = params.max_scrolls || params.maxScrolls || 14;
+    const detectLimit = params.detect_limit || params.detectLimit || 16;
     // Get time filter from params or settings (default: 24 hours)
     const timeFilterHours = params.time_filter_hours || params.timeFilterHours || settings?.tweetTimeFilterHours || 24;
     // Evaluate interaction rules if settings are provided
@@ -168,9 +211,14 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
             ruleReason = ruleReason ? `${ruleReason}; Comment: ${rulesEvaluation.comment.reason}` : `Comment: ${rulesEvaluation.comment.reason}`;
         }
     }
-    // Extract status ID using GrowOps
-    const statusId = drivers.grow.extractStatusId({ params, context });
-    // Scroll and detect tweets using ScrollOps
+    const statusId = resolveScrollTargetStatusIdForGrow(params, context, drivers);
+    if (!statusId) {
+        console.log(`[YapGrow] scroll_and_detect_by_time: scrolling full timeline (no status-ID anchor); then newest tweet within ${timeFilterHours}h`);
+    }
+    if (scrollTimelineTopFirst) {
+        await drivers.grow.scrollPrimaryTimelineToTop();
+        await new Promise((r) => setTimeout(r, 500));
+    }
     const result = await drivers.scroll.scrollAndDetectTweets(statusId, {
         maxScrollSteps,
         detectLimit,
@@ -198,36 +246,51 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
         }
         return;
     }
-    // Sort filtered tweets by timestamp (newest first) and select the newest tweet
+    // Newest first: real time from <time>, else snowflake id (monotonic ~time on X)
     const sortedTweets = [...filteredTweets].sort((a, b) => {
-        // Tweets with timestamp come first, sorted by newest
         if (a.timestamp && b.timestamp) {
-            return b.timestamp.getTime() - a.timestamp.getTime(); // Newest first
+            const dt = b.timestamp.getTime() - a.timestamp.getTime();
+            if (dt !== 0)
+                return dt;
         }
-        if (a.timestamp && !b.timestamp)
-            return -1; // a has timestamp, b doesn't
-        if (!a.timestamp && b.timestamp)
-            return 1; // b has timestamp, a doesn't
-        return 0; // Both have no timestamp, keep original order
+        else if (a.timestamp && !b.timestamp)
+            return -1;
+        else if (!a.timestamp && b.timestamp)
+            return 1;
+        const sa = a.statusId && /^\d+$/.test(a.statusId) ? BigInt(a.statusId) : BigInt(0);
+        const sb = b.statusId && /^\d+$/.test(b.statusId) ? BigInt(b.statusId) : BigInt(0);
+        if (sa !== sb)
+            return sa > sb ? -1 : 1;
+        return 0;
     });
     // Select the newest tweet (first in sorted array)
     const targetTweet = sortedTweets[0];
+    if (targetTweet?.timestamp) {
+        console.log(`[YapGrow] Selected tweet <time> as UTC+7: ${(0, rawops_1.formatUtcInstantAsUtcPlus7)(targetTweet.timestamp)} (status ${targetTweet.statusId || '?'})`);
+    }
+    else if (targetTweet?.statusId) {
+        const approx = drivers.grow.approximateUtcDateFromStatusSnowflake(targetTweet.statusId);
+        if (approx) {
+            console.log(`[YapGrow] Selected tweet time (snowflake → UTC+7): ${(0, rawops_1.formatUtcInstantAsUtcPlus7)(approx)} (status ${targetTweet.statusId})`);
+        }
+    }
     // Process interaction if tweet found and actions enabled
     if (targetTweet && (enableLike || enableComment)) {
+        const workingTweet = await drivers.grow.ensureFreshTweetRefsForInteraction(targetTweet);
         context.detected_target_tweet = {
-            element: targetTweet.element,
-            link: targetTweet.link,
-            statusId: targetTweet.statusId,
-            cellInnerDiv: targetTweet.cellInnerDiv
+            element: workingTweet.element,
+            link: workingTweet.link,
+            statusId: workingTweet.statusId,
+            cellInnerDiv: workingTweet.cellInnerDiv
         };
-        // Scroll to tweet and extract content using GrowOps
-        await drivers.grow.scrollToTweet(targetTweet.cellInnerDiv);
         // Generate AI comment if enabled (rawbot-specific business logic)
         let commentText = undefined;
-        if (enableComment && settings?.aiCommentEnabled &&
-            settings.databasePrompt?.finalPrompt && settings.databasePrompt?.requirePrompt) {
+        if (enableComment && settings?.aiCommentEnabled) {
             try {
-                const postContent = await drivers.grow.extractPostContent(targetTweet.element);
+                const postContent = await drivers.grow.extractPostContentByMeta({
+                    link: workingTweet.link,
+                    statusId: workingTweet.statusId
+                });
                 if (postContent?.trim()) {
                     const generated = await (0, commentAi_1.generateGrowAiComment)(postContent.trim(), settings);
                     if (generated) {
@@ -242,10 +305,10 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
         }
         // Process interaction using CommentOps from rawops
         const interactionResult = await drivers.comment.processTweetInteraction({
-            element: targetTweet.element,
-            link: targetTweet.link,
-            statusId: targetTweet.statusId,
-            cellInnerDiv: targetTweet.cellInnerDiv
+            element: workingTweet.element,
+            link: workingTweet.link,
+            statusId: workingTweet.statusId,
+            cellInnerDiv: workingTweet.cellInnerDiv
         }, {
             enableLike,
             enableComment,

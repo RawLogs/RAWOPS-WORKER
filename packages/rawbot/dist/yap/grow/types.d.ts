@@ -45,6 +45,22 @@ export interface YapGrowSettings {
         weight: number;
     }>;
     promptStyleCategory?: string;
+    /** Same as YapCommentSettings — used by generateCommentWithUserStyles fallback prompt selection */
+    promptStyles?: {
+        category: string;
+        mode: 'select' | 'random';
+        enabled: boolean;
+        selectedStyles: string[];
+        customStyles: Record<string, any>;
+    };
+    availablePromptStyles?: Array<{
+        id: string;
+        name: string;
+        displayName: string;
+        description: string;
+        weight: number;
+        prompt: string;
+    }>;
     databasePrompt?: {
         finalPrompt: string;
         requirePrompt: string;

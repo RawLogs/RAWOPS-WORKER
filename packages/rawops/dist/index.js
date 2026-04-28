@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.quitDriver = exports.saveWindowSize = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.GrowOps = exports.FollowerDiscoveryOps = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
+exports.RawOps = exports.DEFAULT_USER_AGENT = exports.POPULAR_USER_AGENTS = exports.getActualScreenResolution = exports.generateUserAgent = exports.generateSynchronizedConfig = exports.detectIPLocation = exports.smoothRandomScroll = exports.quitDriver = exports.saveWindowSize = exports.parseProxyString = exports.randomDelay = exports.setupBrowser = exports.BEHAVIORAL_PATTERNS = exports.simulateBrowsingSession = exports.quickClickWithMouse = exports.quickScrollWithMouse = exports.createAntiDetection = exports.AntiDetectionIntegration = exports.DISPLAY_TIMEZONE_UTC_PLUS_7 = exports.formatUtcInstantAsUtcPlus7 = exports.calculateFollowRatio = exports.hasPageError = exports.extractErrorDetails = exports.ErrorDriver = exports.GrowOps = exports.FollowerDiscoveryOps = exports.ProfileOps = exports.UsernameExtractionOps = exports.ExtractionOps = exports.EngagementOps = exports.WaitOps = exports.ScrollOps = exports.SearchOps = exports.CommentOps = exports.PostOps = exports.LikeOps = exports.BaseOps = void 0;
 // Import all operation classes
 const base_1 = require("./base");
 Object.defineProperty(exports, "BaseOps", { enumerable: true, get: function () { return base_1.BaseOps; } });
@@ -61,6 +61,9 @@ Object.defineProperty(exports, "extractErrorDetails", { enumerable: true, get: f
 Object.defineProperty(exports, "hasPageError", { enumerable: true, get: function () { return error_driver_2.hasPageError; } });
 var profile_2 = require("./profile");
 Object.defineProperty(exports, "calculateFollowRatio", { enumerable: true, get: function () { return profile_2.calculateFollowRatio; } });
+var datetime_format_1 = require("./utils/datetime-format");
+Object.defineProperty(exports, "formatUtcInstantAsUtcPlus7", { enumerable: true, get: function () { return datetime_format_1.formatUtcInstantAsUtcPlus7; } });
+Object.defineProperty(exports, "DISPLAY_TIMEZONE_UTC_PLUS_7", { enumerable: true, get: function () { return datetime_format_1.DISPLAY_TIMEZONE_UTC_PLUS_7; } });
 /**
  * Main RawOps class that combines all operations
  */

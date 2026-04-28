@@ -22,6 +22,7 @@ import type { ProxyConfig as ProxyConfigAdvanced, LocationInfo, SynchronizedConf
 export { BaseOps, LikeOps, PostOps, CommentOps, SearchOps, ScrollOps, WaitOps, EngagementOps, ExtractionOps, UsernameExtractionOps, ProfileOps, FollowerDiscoveryOps, GrowOps, ErrorDriver };
 export { extractErrorDetails, hasPageError } from './error-driver';
 export { calculateFollowRatio } from './profile';
+export { formatUtcInstantAsUtcPlus7, DISPLAY_TIMEZONE_UTC_PLUS_7 } from './utils/datetime-format';
 export { AntiDetectionIntegration, createAntiDetection, quickScrollWithMouse, quickClickWithMouse, simulateBrowsingSession, BEHAVIORAL_PATTERNS };
 export { setupBrowser, randomDelay, parseProxyString, saveWindowSize, quitDriver };
 export { smoothRandomScroll };
