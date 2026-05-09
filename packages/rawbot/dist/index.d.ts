@@ -7,7 +7,7 @@ export { IAutomationFlow, FlowConfig, FlowResult } from './types/types';
 export type { RawTweetData, SearchOptions, FilterOptions } from './types/types';
 export { default as DatabaseService } from './services/DatabaseService';
 export * from './yap/project/YapProjectService';
-export { CommentByProfile, YapCommentSettings, YapCommentResult, CommentLink } from './yap/comment/cbp';
+export { CommentByProfile, YapCommentSettings, YapCommentResult, CommentLink, PromotionalUrlListEntry } from './yap/comment/cbp';
 export { CommentByLink } from './yap/comment/cbl';
 export { YapInitManager, YapProfile, YapInitConfig } from './yap/YapInitManager';
 export { YapGrow } from './yap/grow/yg';

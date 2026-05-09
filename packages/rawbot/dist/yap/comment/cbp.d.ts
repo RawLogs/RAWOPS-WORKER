@@ -1,4 +1,9 @@
 import { Project, Run } from '@rawops/shared';
+/** CBL: one row in the optional URL + description list (stored in comment settings JSON). */
+export interface PromotionalUrlListEntry {
+    url: string;
+    description: string;
+}
 export interface YapCommentSettings {
     aiCommentEnabled: boolean;
     aiCommentPrompt: string;
@@ -54,6 +59,13 @@ export interface YapCommentSettings {
         requirePrompt: string;
     } | null;
     profileId?: string;
+    /**
+     * Comment-by-link only: when enabled with non-empty {@link promotionalUrlList},
+     * AI may pick one entry whose description fits the extracted post (and optional reply target);
+     * the chosen URL is injected via extra instructions on top of the existing comment pipeline.
+     */
+    promotionalUrlListEnabled?: boolean;
+    promotionalUrlList?: PromotionalUrlListEntry[];
 }
 export interface YapCommentResult {
     success: boolean;

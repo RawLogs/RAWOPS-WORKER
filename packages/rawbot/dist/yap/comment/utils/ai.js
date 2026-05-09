@@ -2,17 +2,16 @@
 // packages/rawbot/src/yap/comment/utils/ai.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildContentAI = buildContentAI;
+exports.buildAnalysisAI = buildAnalysisAI;
+exports.getActivePromotionalUrlEntries = getActivePromotionalUrlEntries;
+exports.resolvePromotionalInjectForCbl = resolvePromotionalInjectForCbl;
 exports.generateCommentWithUserStyles = generateCommentWithUserStyles;
 exports.selectRandomPromptStyle = selectRandomPromptStyle;
 exports.cleanCommentForBMP = cleanCommentForBMP;
 exports.generateReplyToComment = generateReplyToComment;
 exports.generateReplyToTweetComment = generateReplyToTweetComment;
 const rawai_1 = require("@rawops/rawai");
-/**
- * Build a ContentAI instance from YapCommentSettings.
- * Same logic as CBP/CBL runYapCommentWorkflow — single source of truth.
- */
-function buildContentAI(settings) {
+function buildAIConfigFromSettings(settings) {
     const hasGeminiKey = !!settings.geminiApiKey;
     const hasProfileKeys = settings.profileApiKeys && (settings.profileApiKeys.geminiApiKey ||
         settings.profileApiKeys.openaiApiKey ||
@@ -42,10 +41,109 @@ function buildContentAI(settings) {
         apiKeys.gemini = settings.geminiApiKey;
     }
     aiConfig.apiKeys = apiKeys;
-    // providerPriority is either set from profileApiKeys.apiKeyPriority, or left unset
-    // so BaseAI falls back to its default ['openai','gemini','deepseek','huggingface'].
-    // Never force ['gemini'] — that would ignore the user's configured priority.
+    return aiConfig;
+}
+/**
+ * Build a ContentAI instance from YapCommentSettings.
+ * Same logic as CBP/CBL runYapCommentWorkflow — single source of truth.
+ */
+function buildContentAI(settings) {
+    const aiConfig = buildAIConfigFromSettings(settings);
+    if (!aiConfig) {
+        return null;
+    }
     return new rawai_1.ContentAI(aiConfig);
+}
+/** Same keys as ContentAI; used for CBL promotional-list matching without touching comment prompts. */
+function buildAnalysisAI(settings) {
+    const aiConfig = buildAIConfigFromSettings(settings);
+    if (!aiConfig) {
+        return null;
+    }
+    return new rawai_1.AnalysisAI(aiConfig);
+}
+function getActivePromotionalUrlEntries(settings) {
+    if (!settings.promotionalUrlListEnabled || !Array.isArray(settings.promotionalUrlList)) {
+        return [];
+    }
+    return settings.promotionalUrlList.filter((e) => !!e &&
+        typeof e.url === 'string' &&
+        e.url.trim().length > 0 &&
+        typeof e.description === 'string' &&
+        e.description.trim().length > 0);
+}
+function stripJsonFence(raw) {
+    let t = raw.trim();
+    if (t.startsWith('```')) {
+        t = t.replace(/^```(?:json)?\s*/i, '');
+        t = t.replace(/\s*```\s*$/i, '').trim();
+    }
+    return t;
+}
+function parsePromotionalSelectionIndex(raw) {
+    try {
+        const cleaned = stripJsonFence(raw);
+        const obj = JSON.parse(cleaned);
+        if (obj.selectedIndex === null || obj.selectedIndex === undefined) {
+            return null;
+        }
+        const n = typeof obj.selectedIndex === 'number' ? obj.selectedIndex : parseInt(String(obj.selectedIndex), 10);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+            return null;
+        }
+        return n;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * CBL: pick at most one promotional row that fits the post (Selenium-extracted text + optional reply snippet).
+ */
+async function resolvePromotionalInjectForCbl(postContent, replyContext, settings) {
+    const entries = getActivePromotionalUrlEntries(settings);
+    if (!entries.length || !settings.aiCommentEnabled) {
+        return null;
+    }
+    const analysisAI = buildAnalysisAI(settings);
+    if (!analysisAI) {
+        console.log('[YapComment] Promotional URL list: skip (no API keys for AnalysisAI)');
+        return null;
+    }
+    const maxItems = 24;
+    const list = entries.slice(0, maxItems);
+    const enumerated = list
+        .map((e, i) => `${i}:\n  url: ${JSON.stringify(e.url)}\n  description: ${JSON.stringify(e.description.slice(0, 2000))}`)
+        .join('\n\n');
+    const prompt = `You choose at most ONE promotional entry for a reply to a social post.
+
+MAIN_POST:
+${JSON.stringify(postContent.slice(0, 8000))}
+
+${replyContext && replyContext.trim() ? `REPLY_THREAD_SNIPPET (comment or sub-tweet under which we may reply):\n${JSON.stringify(replyContext.slice(0, 4000))}\n\n` : ''}CANDIDATES (indices 0..${list.length - 1}):
+${enumerated}
+
+Rules:
+- Pick one index only if that entry's description aligns with the post (and snippet if any) so that mentioning the URL would read natural, not spammy.
+- If none fit, selectedIndex must be null.
+- Respond with ONLY JSON: {"selectedIndex": <number or null>, "reason": "<brief>"}`;
+    const result = await analysisAI.runAdHocPrompt(prompt);
+    if (!result.success || !result.content) {
+        console.log('[YapComment] Promotional URL list: AI selection failed', result.error);
+        return null;
+    }
+    const idx = parsePromotionalSelectionIndex(result.content);
+    if (idx === null) {
+        console.log('[YapComment] Promotional URL list: no matching index (null)');
+        return null;
+    }
+    if (idx >= list.length) {
+        console.log('[YapComment] Promotional URL list: invalid index from AI', idx);
+        return null;
+    }
+    const chosen = list[idx];
+    console.log(`[YapComment] Promotional URL list: selected index ${idx} url=${chosen.url.substring(0, 48)}...`);
+    return chosen;
 }
 /**
  * Generate comment with user styles using available prompt styles.
@@ -55,7 +153,7 @@ function buildContentAI(settings) {
  * from `profileApiKeys.apiKeyPriority`.  When omitted the function builds a fresh
  * instance from `settings` (legacy behaviour).
  */
-async function generateCommentWithUserStyles(postContent, settings, commentContent, commentUsername, existingAI) {
+async function generateCommentWithUserStyles(postContent, settings, commentContent, commentUsername, existingAI, promotionalInject) {
     try {
         console.log('[YapComment] Starting comment generation...');
         console.log(`[YapComment] Post content length: ${postContent.length}`);
@@ -114,6 +212,33 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
                     promptToUse = selectedPromptStyle.prompt;
                     console.log(`[YapComment] Using prompt style: ${selectedPromptStyle.displayName} (${selectedPromptStyle.name})`);
                 }
+            }
+        }
+        if (promotionalInject?.url?.trim()) {
+            const injectBlock = [
+                'PROMOTIONAL LINK (contextual, CBL — in addition to your prompt style above):',
+                'Include this URL exactly once as plain text in the reply (no markdown link syntax):',
+                promotionalInject.url.trim(),
+                'Relevance angle (use only if it still matches the thread naturally):',
+                promotionalInject.description.trim(),
+                'Write a natural reply; do not label as promotion or sponsorship. Keep the voice and rules from the prompt style / database instructions.'
+            ].join('\n');
+            const basePrompt = promptToUse.trim();
+            if (basePrompt) {
+                promptToUse = `${basePrompt}\n\n${injectBlock}`;
+                console.log('[YapComment] Appended promotional URL after prompt style / custom prompt');
+            }
+            else {
+                // When database {style} is filled from customPrompt only, avoid replacing {style} with promo-only text — keep style instructions.
+                const styleAnchor = (selectedPromptStyle && typeof selectedPromptStyle === 'object' && selectedPromptStyle.prompt)
+                    ? String(selectedPromptStyle.prompt).trim()
+                    : (settings.aiCommentPrompt?.trim() || '');
+                promptToUse = styleAnchor
+                    ? `${styleAnchor}\n\n${injectBlock}`
+                    : injectBlock;
+                console.log(styleAnchor
+                    ? '[YapComment] Promotional URL: combined style anchor + promo (prompt style preserved for {style})'
+                    : '[YapComment] Promotional URL: promo-only additional block (no separate style text in settings)');
             }
         }
         // Use pre-initialised ContentAI when available (carries correct providerPriority)

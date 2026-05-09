@@ -1,11 +1,14 @@
 "use strict";
 // packages/rawbot/src/yap/comment/utils/index.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bulkUpdateLinksStatusAPI = exports.saveCacheAndSubmitAPI = exports.saveLinkStatusToAPI = exports.filterProcessedLinks = exports.updateRemainingLinksAPI = exports.submitCacheToAPI = exports.saveToCache = exports.ensureCacheDirectory = exports.getPageInfo = exports.waitForPageLoad = exports.checkPageLoad = exports.performRandomMouseMovements = exports.performIdleScroll = exports.scrollToFindComments = exports.performRandomScrollPattern = exports.generateReplyToTweetComment = exports.generateReplyToComment = exports.cleanCommentForBMP = exports.selectRandomPromptStyle = exports.buildContentAI = exports.generateCommentWithUserStyles = void 0;
+exports.incrementPromotionalSuccessViaAPI = exports.bulkUpdateLinksStatusAPI = exports.saveCacheAndSubmitAPI = exports.saveLinkStatusToAPI = exports.filterProcessedLinks = exports.updateRemainingLinksAPI = exports.submitCacheToAPI = exports.saveToCache = exports.ensureCacheDirectory = exports.getPageInfo = exports.waitForPageLoad = exports.checkPageLoad = exports.performRandomMouseMovements = exports.performIdleScroll = exports.scrollToFindComments = exports.performRandomScrollPattern = exports.generateReplyToTweetComment = exports.generateReplyToComment = exports.cleanCommentForBMP = exports.selectRandomPromptStyle = exports.resolvePromotionalInjectForCbl = exports.getActivePromotionalUrlEntries = exports.buildAnalysisAI = exports.buildContentAI = exports.generateCommentWithUserStyles = void 0;
 // AI utilities
 var ai_1 = require("./ai");
 Object.defineProperty(exports, "generateCommentWithUserStyles", { enumerable: true, get: function () { return ai_1.generateCommentWithUserStyles; } });
 Object.defineProperty(exports, "buildContentAI", { enumerable: true, get: function () { return ai_1.buildContentAI; } });
+Object.defineProperty(exports, "buildAnalysisAI", { enumerable: true, get: function () { return ai_1.buildAnalysisAI; } });
+Object.defineProperty(exports, "getActivePromotionalUrlEntries", { enumerable: true, get: function () { return ai_1.getActivePromotionalUrlEntries; } });
+Object.defineProperty(exports, "resolvePromotionalInjectForCbl", { enumerable: true, get: function () { return ai_1.resolvePromotionalInjectForCbl; } });
 Object.defineProperty(exports, "selectRandomPromptStyle", { enumerable: true, get: function () { return ai_1.selectRandomPromptStyle; } });
 Object.defineProperty(exports, "cleanCommentForBMP", { enumerable: true, get: function () { return ai_1.cleanCommentForBMP; } });
 Object.defineProperty(exports, "generateReplyToComment", { enumerable: true, get: function () { return ai_1.generateReplyToComment; } });
@@ -31,3 +34,5 @@ Object.defineProperty(exports, "filterProcessedLinks", { enumerable: true, get: 
 Object.defineProperty(exports, "saveLinkStatusToAPI", { enumerable: true, get: function () { return cache_1.saveLinkStatusToAPI; } });
 Object.defineProperty(exports, "saveCacheAndSubmitAPI", { enumerable: true, get: function () { return cache_1.saveCacheAndSubmitAPI; } });
 Object.defineProperty(exports, "bulkUpdateLinksStatusAPI", { enumerable: true, get: function () { return cache_1.bulkUpdateLinksStatusAPI; } });
+var promotional_stats_1 = require("./promotional-stats");
+Object.defineProperty(exports, "incrementPromotionalSuccessViaAPI", { enumerable: true, get: function () { return promotional_stats_1.incrementPromotionalSuccessViaAPI; } });

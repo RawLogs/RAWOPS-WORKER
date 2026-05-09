@@ -20,6 +20,11 @@ export declare class AnalysisAI extends BaseAI {
      */
     analyzeTweet(tweetContent: string, options?: AnalysisOptions): Promise<AIResult>;
     /**
+     * Single-shot completion for automation (e.g. CBL promotional URL list matching).
+     * Caller supplies the full prompt; response is raw model text (often JSON).
+     */
+    runAdHocPrompt(prompt: string): Promise<AIResult>;
+    /**
      * Analyze multiple tweets for comparison
      */
     analyzeTweetBatch(tweets: string[], options?: AnalysisOptions): Promise<AIResult>;

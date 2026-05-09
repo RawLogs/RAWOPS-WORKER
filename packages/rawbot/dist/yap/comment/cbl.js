@@ -170,6 +170,9 @@ class CommentByLink {
                             errors.push(...parallelResult.errors);
                         }
                         console.log(`[YapComment] ✅ Successfully processed: ${link}`);
+                        if (result.usedPromotionalInject) {
+                            void (0, utils_1.incrementPromotionalSuccessViaAPI)(this.profileId);
+                        }
                     }
                     else {
                         failedLinks.push(link);
@@ -336,15 +339,24 @@ class CommentByLink {
             await this.commentOps.randomDelay(2000, 3000);
             // Step 7: COMMENT LOGIC - Decide whether to reply to comment or main tweet
             let commented = false;
+            let hadPromotionalSelection = null;
             if (postContent) {
                 try {
                     // Check if we should reply to a comment instead of the main tweet
                     const currentProfileHandle = run.profile?.handle || 'unknown';
                     const otherUserTweetAnalysis = await this.extractionOps.findLastTweetFromOtherUsers(currentProfileHandle);
+                    let promotionalInject = null;
+                    if (settings.promotionalUrlListEnabled) {
+                        const replySnippet = otherUserTweetAnalysis.hasOtherUserTweet && otherUserTweetAnalysis.lastTweetContent
+                            ? otherUserTweetAnalysis.lastTweetContent
+                            : undefined;
+                        promotionalInject = await (0, utils_1.resolvePromotionalInjectForCbl)(postContent, replySnippet, settings);
+                    }
+                    hadPromotionalSelection = promotionalInject;
                     if (otherUserTweetAnalysis.hasOtherUserTweet && otherUserTweetAnalysis.lastTweetContent) {
                         console.log('[YapComment] Found tweet from other user - will reply to that tweet');
                         // Generate reply to the tweet using generateCommentWithUserStyles
-                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, otherUserTweetAnalysis.lastTweetContent, otherUserTweetAnalysis.lastTweetUsername || 'unknown', this.contentAI);
+                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, otherUserTweetAnalysis.lastTweetContent, otherUserTweetAnalysis.lastTweetUsername || 'unknown', this.contentAI, promotionalInject);
                         if (commentText) {
                             console.log(`[YapComment] Generated reply to comment: "${commentText}"`);
                             console.log('[YapComment] Posting reply to comment...');
@@ -391,7 +403,7 @@ class CommentByLink {
                     else {
                         console.log('[YapComment] No tweet from other users found - commenting on main tweet');
                         // Generate comment for main tweet
-                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, undefined, undefined, this.contentAI);
+                        const commentText = await (0, utils_1.generateCommentWithUserStyles)(postContent, settings, undefined, undefined, this.contentAI, promotionalInject);
                         if (commentText) {
                             console.log(`[YapComment] Generated comment: "${commentText}"`);
                             console.log('[YapComment] Posting comment...');
@@ -432,7 +444,8 @@ class CommentByLink {
             return {
                 success: commented, // Only success if comment was posted
                 liked,
-                commented
+                commented,
+                usedPromotionalInject: !!(commented && hadPromotionalSelection)
             };
         }
         catch (error) {

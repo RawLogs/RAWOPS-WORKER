@@ -1,4 +1,5 @@
-export { generateCommentWithUserStyles, buildContentAI, selectRandomPromptStyle, cleanCommentForBMP, generateReplyToComment, generateReplyToTweetComment } from './ai';
+export { generateCommentWithUserStyles, buildContentAI, buildAnalysisAI, getActivePromotionalUrlEntries, resolvePromotionalInjectForCbl, selectRandomPromptStyle, cleanCommentForBMP, generateReplyToComment, generateReplyToTweetComment } from './ai';
 export { performRandomScrollPattern, scrollToFindComments, performIdleScroll, performRandomMouseMovements } from './anti';
 export { checkPageLoad, waitForPageLoad, getPageInfo } from './page';
 export { ensureCacheDirectory, saveToCache, submitCacheToAPI, updateRemainingLinksAPI, filterProcessedLinks, saveLinkStatusToAPI, saveCacheAndSubmitAPI, bulkUpdateLinksStatusAPI } from './cache';
+export { incrementPromotionalSuccessViaAPI } from './promotional-stats';

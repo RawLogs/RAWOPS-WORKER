@@ -65,6 +65,13 @@ Respond with ONLY the JSON object - no other text.`;
         return result;
     }
     /**
+     * Single-shot completion for automation (e.g. CBL promotional URL list matching).
+     * Caller supplies the full prompt; response is raw model text (often JSON).
+     */
+    async runAdHocPrompt(prompt) {
+        return this.generateWithRetry(prompt);
+    }
+    /**
      * Analyze multiple tweets for comparison
      */
     async analyzeTweetBatch(tweets, options = {}) {
