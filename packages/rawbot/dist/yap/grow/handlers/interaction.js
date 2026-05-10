@@ -37,24 +37,48 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleScrollAndDetectTweets = handleScrollAndDetectTweets;
 exports.handleScrollAndDetectTweetsByTime = handleScrollAndDetectTweetsByTime;
 const utils_1 = require("../../comment/utils");
-async function evaluateTweetInteractionGate(tweet, settings, drivers) {
+async function evaluateTweetInteractionGate(tweet, settings, drivers, context) {
     const onlyVerified = settings?.onlyVerifiedAccounts === true;
     const minFollowers = Math.max(0, Number(settings?.minFollowersToInteract) || 0);
     if (!onlyVerified && minFollowers <= 0) {
         return { ok: true };
     }
-    if (onlyVerified && !tweet.authorVerified) {
-        return {
-            ok: false,
-            reason: 'Tweet author does not show a verified badge in the author row (UserName / icon-verified / aria Verified account).'
-        };
+    const profile = context.current_profile;
+    let authorMatchesProfile = false;
+    if (profile?.username) {
+        const handle = await drivers.grow.getPrimaryTweetAuthorUsername(tweet.element);
+        if (handle) {
+            const h = handle.replace(/^@/, '').toLowerCase();
+            const p = String(profile.username).replace(/^@/, '').toLowerCase();
+            authorMatchesProfile = h === p;
+        }
+    }
+    if (onlyVerified) {
+        const verifiedFromTweet = !!tweet.authorVerified;
+        const verifiedFromProfile = authorMatchesProfile && profile?.is_verified === true;
+        if (!verifiedFromTweet && !verifiedFromProfile) {
+            return {
+                ok: false,
+                reason: 'Tweet author does not show a verified badge in the author row, and profile extract does not show verified for this author.'
+            };
+        }
     }
     if (minFollowers > 0) {
+        if (authorMatchesProfile && typeof profile?.followers_count === 'number') {
+            const fc = profile.followers_count;
+            if (fc < minFollowers) {
+                return {
+                    ok: false,
+                    reason: `Author @${profile.username} has ${fc} followers (from extracted profile); minimum required is ${minFollowers}.`
+                };
+            }
+            return { ok: true };
+        }
         const fc = await drivers.followerDiscovery.extractTweetAuthorFollowersViaHover(tweet.element);
         if (fc === null) {
             return {
                 ok: false,
-                reason: 'Could not read author follower count from hover card (min followers gate).'
+                reason: 'Could not read author follower count from hover card. On a profile timeline after extract_profile, the tweet author must match the profile to use follower counts from extract.'
             };
         }
         if (fc < minFollowers) {
@@ -107,7 +131,7 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
     context.detected_tweets = result.detectedTweets;
     // Process interaction if tweet found and actions enabled
     if (result.tweet && (enableLike || enableComment)) {
-        const gate = await evaluateTweetInteractionGate(result.tweet, settings, drivers);
+        const gate = await evaluateTweetInteractionGate(result.tweet, settings, drivers, context);
         if (!gate.ok) {
             console.log(`[YapGrow] Interaction skipped (targeting gate): ${gate.reason}`);
             context.detected_target_tweet = null;
@@ -262,7 +286,7 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
     let targetTweet = null;
     let lastGateReason;
     for (const tw of sortedTweets) {
-        const gate = await evaluateTweetInteractionGate(tw, settings, drivers);
+        const gate = await evaluateTweetInteractionGate(tw, settings, drivers, context);
         if (gate.ok) {
             targetTweet = tw;
             break;

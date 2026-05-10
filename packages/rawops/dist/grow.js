@@ -380,6 +380,41 @@ class GrowOps extends base_1.BaseOps {
         return filteredTweets;
     }
     /**
+     * Primary author handle from a tweet row (profile link under UserName), for matching current_profile
+     * when Grow is on that user's profile timeline (skip hover for min-followers / verified fallback).
+     */
+    async getPrimaryTweetAuthorUsername(tweetElement) {
+        try {
+            const raw = (await this.driver.executeScript(`
+        const tweet = arguments[0];
+        if (!tweet) return null;
+        const cell = tweet.closest('[data-testid="cellInnerDiv"]');
+        const scope = (cell && cell.querySelector('[data-testid="tweet"]')) || tweet;
+        const block = scope.querySelector('[data-testid="UserName"], [data-testid="User-Name"]');
+        if (!block) return null;
+        const links = block.querySelectorAll('a[href^="/"], a[href*="x.com/"], a[href*="twitter.com/"]');
+        const skip = new Set(['home','i','explore','notifications','messages','settings','compose','search-advanced','intent','hashtag']);
+        for (let i = 0; i < links.length; i++) {
+          let href = links[i].getAttribute('href') || '';
+          const pathOnly = href.replace(/^https?:\\/\\/(www\\.)?(x\\.com|twitter\\.com)/i, '').split('?')[0];
+          const m = pathOnly.match(/^\\/([^/]+)\\/?$/);
+          if (!m) continue;
+          const seg = m[1].toLowerCase();
+          if (skip.has(seg)) continue;
+          if (pathOnly.includes('/status/')) continue;
+          return m[1];
+        }
+        return null;
+        `, tweetElement));
+            if (!raw || !String(raw).trim())
+                return null;
+            return String(raw).trim();
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
      * Resolve status id from explicit value or permalink in link.
      */
     resolveStatusIdForTweet(statusId, link) {

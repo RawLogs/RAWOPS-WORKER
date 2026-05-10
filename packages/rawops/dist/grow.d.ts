@@ -94,6 +94,11 @@ export declare class GrowOps extends BaseOps {
         authorVerified?: boolean;
     }>, timeFilterHours: number): Promise<FilteredTweet[]>;
     /**
+     * Primary author handle from a tweet row (profile link under UserName), for matching current_profile
+     * when Grow is on that user's profile timeline (skip hover for min-followers / verified fallback).
+     */
+    getPrimaryTweetAuthorUsername(tweetElement: any): Promise<string | null>;
+    /**
      * Resolve status id from explicit value or permalink in link.
      */
     private resolveStatusIdForTweet;
