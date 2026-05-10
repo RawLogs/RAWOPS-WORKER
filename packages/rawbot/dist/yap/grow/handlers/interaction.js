@@ -46,7 +46,7 @@ async function evaluateTweetInteractionGate(tweet, settings, drivers) {
     if (onlyVerified && !tweet.authorVerified) {
         return {
             ok: false,
-            reason: 'Tweet author does not have a verified badge (icon-verified in UserName).'
+            reason: 'Tweet author does not show a verified badge in the author row (UserName / icon-verified / aria Verified account).'
         };
     }
     if (minFollowers > 0) {

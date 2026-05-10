@@ -172,8 +172,15 @@ class ProfileOps extends base_1.BaseOps {
             }
             try {
                 profileData.is_verified = (await this.driver.executeScript(`
-          const block = document.querySelector('[data-testid="UserName"]');
-          return !!(block && block.querySelector('[data-testid="icon-verified"]'));
+          const col = document.querySelector('[data-testid="primaryColumn"]');
+          const root = col || document;
+          const user = root.querySelector('[data-testid="UserName"], [data-testid="User-Name"]');
+          if (!user) return false;
+          return !!(
+            user.querySelector('[data-testid="icon-verified"]') ||
+            user.querySelector('svg[aria-label="Verified account"]') ||
+            user.querySelector('button[aria-label*="verified account" i]')
+          );
         `));
             }
             catch {

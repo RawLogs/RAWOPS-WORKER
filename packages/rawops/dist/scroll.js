@@ -476,11 +476,57 @@ class ScrollOps extends base_1.BaseOps {
               // Timestamp extraction failed, continue without it
             }
 
-            const userNameBlock = tweet.querySelector('[data-testid="UserName"]');
-            const authorVerified = !!(
-              userNameBlock &&
-              userNameBlock.querySelector('[data-testid="icon-verified"]')
-            );
+            // Primary author verified badge. Scope: first tweet article in this cell (outer row),
+            // so nested quote/retweet inner articles still read the main author's UserName.
+            // Only exclude [data-testid="quoteTweet"] — do not use embeddedTweet as "quote" (it can wrap the whole card and hide the real UserName).
+            let authorVerified = false;
+            try {
+              let authorScope = tweet;
+              if (cellInnerDiv) {
+                const firstArticle = cellInnerDiv.querySelector('[data-testid="tweet"]');
+                if (firstArticle) authorScope = firstArticle;
+              }
+              const quoteRoot = authorScope.querySelector('[data-testid="quoteTweet"]');
+              const tweetText = authorScope.querySelector('[data-testid="tweetText"]');
+              const isInQuoteTweet = function (el) {
+                return !!(el && el.closest && el.closest('[data-testid="quoteTweet"]'));
+              };
+              const iconInAuthorHeader = function (el) {
+                if (!el || !authorScope.contains(el) || isInQuoteTweet(el)) return false;
+                if (el.closest && el.closest('[data-testid="tweetText"]')) return false;
+                if (!tweetText) return true;
+                const pos = tweetText.compareDocumentPosition(el);
+                return !!(pos & Node.DOCUMENT_POSITION_PRECEDING);
+              };
+              const nameBlocks = authorScope.querySelectorAll(
+                '[data-testid="UserName"], [data-testid="User-Name"]'
+              );
+              for (let nb = 0; nb < nameBlocks.length; nb++) {
+                const block = nameBlocks[nb];
+                if (isInQuoteTweet(block)) continue;
+                if (
+                  block.querySelector('[data-testid="icon-verified"]') ||
+                  block.querySelector('svg[aria-label="Verified account"]') ||
+                  block.querySelector('button[aria-label*="verified account" i]')
+                ) {
+                  authorVerified = true;
+                  break;
+                }
+              }
+              if (!authorVerified) {
+                const icons = authorScope.querySelectorAll(
+                  '[data-testid="icon-verified"], svg[aria-label="Verified account"]'
+                );
+                for (let ic = 0; ic < icons.length; ic++) {
+                  if (iconInAuthorHeader(icons[ic])) {
+                    authorVerified = true;
+                    break;
+                  }
+                }
+              }
+            } catch (eVer) {
+              authorVerified = false;
+            }
             
             tweetData.push({
               element: tweet,
