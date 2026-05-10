@@ -388,21 +388,34 @@ class GrowOps extends base_1.BaseOps {
             const raw = (await this.driver.executeScript(`
         const tweet = arguments[0];
         if (!tweet) return null;
+        const skip = new Set(['home','i','explore','notifications','messages','settings','compose','search-advanced','intent','hashtag']);
+        function pathFromHref(href) {
+          if (!href) return '';
+          return href.replace(/^https?:\\/\\/(www\\.)?(x\\.com|twitter\\.com)/i, '').split('?')[0];
+        }
+        function userFromProfilePath(path) {
+          const m = path.match(/^\\/([^/]+)\\/?$/);
+          if (!m) return null;
+          const seg = m[1].toLowerCase();
+          if (skip.has(seg) || path.includes('/status/')) return null;
+          return m[1];
+        }
         const cell = tweet.closest('[data-testid="cellInnerDiv"]');
         const scope = (cell && cell.querySelector('[data-testid="tweet"]')) || tweet;
         const block = scope.querySelector('[data-testid="UserName"], [data-testid="User-Name"]');
-        if (!block) return null;
-        const links = block.querySelectorAll('a[href^="/"], a[href*="x.com/"], a[href*="twitter.com/"]');
-        const skip = new Set(['home','i','explore','notifications','messages','settings','compose','search-advanced','intent','hashtag']);
-        for (let i = 0; i < links.length; i++) {
-          let href = links[i].getAttribute('href') || '';
-          const pathOnly = href.replace(/^https?:\\/\\/(www\\.)?(x\\.com|twitter\\.com)/i, '').split('?')[0];
-          const m = pathOnly.match(/^\\/([^/]+)\\/?$/);
-          if (!m) continue;
-          const seg = m[1].toLowerCase();
-          if (skip.has(seg)) continue;
-          if (pathOnly.includes('/status/')) continue;
-          return m[1];
+        if (block) {
+          const links = block.querySelectorAll('a[href^="/"], a[href*="x.com/"], a[href*="twitter.com/"]');
+          for (let i = 0; i < links.length; i++) {
+            const pathOnly = pathFromHref(links[i].getAttribute('href') || '');
+            const u = userFromProfilePath(pathOnly);
+            if (u) return u;
+          }
+        }
+        const statusA = scope.querySelector('a[href*="/status/"]');
+        if (statusA) {
+          const pathOnly = pathFromHref(statusA.getAttribute('href') || '');
+          const m2 = pathOnly.match(/^\\/([^/]+)\\/status\\/\\d+/i);
+          if (m2 && !skip.has(m2[1].toLowerCase())) return m2[1];
         }
         return null;
         `, tweetElement));

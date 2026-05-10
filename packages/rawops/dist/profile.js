@@ -42,6 +42,14 @@ class ProfileOps extends base_1.BaseOps {
             return Math.floor(number * 1000000000);
         }
         else {
+            const onlyNums = cleanText.replace(/[^\d.,]/g, '');
+            // European-style grouped thousands: 10.400, 12.345.678 (no K/M/B)
+            if (/^\d{1,3}([.,]\d{3})+$/.test(onlyNums)) {
+                const parsedGrouped = parseInt(onlyNums.replace(/[.,]/g, ''), 10);
+                if (!isNaN(parsedGrouped) && parsedGrouped > 0) {
+                    return parsedGrouped;
+                }
+            }
             // Handle regular numbers with commas or dots as thousand separators
             // For numbers like "1,843" or "1.843", treat both as thousand separators
             let numberOnly = cleanText;

@@ -40,6 +40,13 @@ class FollowerDiscoveryOps extends base_1.BaseOps {
             return Math.floor(number * 1000000000);
         }
         else {
+            const onlyNums = cleanText.replace(/[^\d.,]/g, '');
+            if (/^\d{1,3}([.,]\d{3})+$/.test(onlyNums)) {
+                const parsedGrouped = parseInt(onlyNums.replace(/[.,]/g, ''), 10);
+                if (!isNaN(parsedGrouped) && parsedGrouped > 0) {
+                    return parsedGrouped;
+                }
+            }
             // Handle regular numbers with commas or dots as thousand separators
             let numberOnly = cleanText;
             if (cleanText.length >= 4 && (cleanText.includes(',') || cleanText.includes('.'))) {
@@ -382,7 +389,6 @@ class FollowerDiscoveryOps extends base_1.BaseOps {
      */
     async extractTweetAuthorFollowersViaHover(tweetElement) {
         try {
-            const links = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="UserName"] a[href^="/"]'));
             const skip = new Set([
                 'home',
                 'i',
@@ -396,19 +402,33 @@ class FollowerDiscoveryOps extends base_1.BaseOps {
                 'hashtag'
             ]);
             let hoverTarget = null;
-            for (const link of links) {
+            const linkCandidates = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="UserName"] a, [data-testid="User-Name"] a'));
+            for (const link of linkCandidates) {
                 const href = (await link.getAttribute('href')) || '';
                 const pathOnly = href.replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com)/i, '').split('?')[0];
-                const m = pathOnly.match(/^\/([^/]+)\/?$/);
-                if (!m)
-                    continue;
-                const seg = m[1].toLowerCase();
-                if (skip.has(seg))
-                    continue;
-                if (pathOnly.includes('/status/'))
-                    continue;
-                hoverTarget = link;
-                break;
+                const profileOnly = pathOnly.match(/^\/([^/]+)\/?$/);
+                if (profileOnly) {
+                    const seg = profileOnly[1].toLowerCase();
+                    if (skip.has(seg))
+                        continue;
+                    if (pathOnly.includes('/status/'))
+                        continue;
+                    hoverTarget = link;
+                    break;
+                }
+                const statusPath = pathOnly.match(/^\/([^/]+)\/status\/\d+/i);
+                if (statusPath) {
+                    const seg = statusPath[1].toLowerCase();
+                    if (skip.has(seg))
+                        continue;
+                    try {
+                        hoverTarget = await tweetElement.findElement(selenium_webdriver_1.By.css(`[data-testid="UserName"] a[href="/${statusPath[1]}"], a[href="/${statusPath[1]}"]`));
+                    }
+                    catch {
+                        hoverTarget = link;
+                    }
+                    break;
+                }
             }
             if (!hoverTarget) {
                 console.log('[FollowerDiscoveryOps] No profile link in UserName for tweet author hover');
