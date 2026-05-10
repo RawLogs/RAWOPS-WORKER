@@ -16,6 +16,10 @@ export interface YapGrowSettings {
     enableLike?: boolean;
     enableComment?: boolean;
     tweetTimeFilterHours?: number;
+    /** When true, only like/comment on tweets whose author shows the blue check; follow only verified profiles. */
+    onlyVerifiedAccounts?: boolean;
+    /** Minimum follower count for the tweet author (hover card) or profile being followed. 0 = disabled. */
+    minFollowersToInteract?: number;
     aiCommentEnabled?: boolean;
     geminiApiKey?: string;
     profileApiKeys?: {
@@ -100,7 +104,14 @@ export interface FlowContext {
         liked?: boolean;
         commented?: boolean;
         ruleReason?: string;
+        gateReason?: string;
     };
     target_status_id?: string | null;
     remainingLinksCount?: number;
+    /**
+     * Set by scroll_and_detect_by_time: true when like/comment were requested but no tweet interaction ran
+     * (no tweet in time window, or all candidates failed gates). Cleared by scroll_and_detect and each new link.
+     * Follow step skips when this is true.
+     */
+    grow_skip_follow_after_by_time?: boolean;
 }

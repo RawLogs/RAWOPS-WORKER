@@ -197,6 +197,7 @@ class YapGrow {
                 this.context.following_status = false;
                 this.context.target_status_id = null; // Reset for each link
                 this.context.interaction_result = undefined; // Reset interaction result for each link
+                this.context.grow_skip_follow_after_by_time = undefined;
                 // Calculate remaining links count for discovery rule evaluation
                 // This is ONLY evaluated at the start of each new link, not during steps
                 // Use settings.links (which may be updated after discovery) instead of filteredLinks

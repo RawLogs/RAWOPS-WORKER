@@ -20,6 +20,7 @@ async function incrementPromotionalSuccessViaAPI(profileId) {
     }
     try {
         const baseUrl = getApiBaseUrl();
+        console.log(`[YapComment] Promotional stats: POST increment profileId=${profileId} …`);
         const res = await fetch(`${baseUrl}/user/comment-promotional-stats`, {
             method: 'POST',
             headers: {
@@ -29,7 +30,10 @@ async function incrementPromotionalSuccessViaAPI(profileId) {
             body: JSON.stringify({ profileId, action: 'increment' }),
             signal: AbortSignal.timeout(12000)
         });
-        if (!res.ok) {
+        if (res.ok) {
+            console.log(`[YapComment] Promotional stats increment OK profileId=${profileId}`);
+        }
+        else {
             const text = await res.text().catch(() => '');
             console.log(`[YapComment] Promotional stats increment HTTP ${res.status}: ${text.slice(0, 200)}`);
         }

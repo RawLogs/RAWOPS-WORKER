@@ -19,6 +19,8 @@ export interface FilteredTweet {
     statusId: string | null;
     cellInnerDiv: any;
     timestamp: Date | null;
+    /** Present when tweet was detected via scroll script (X blue check in UserName). */
+    authorVerified?: boolean;
 }
 export interface ScrollAndDetectTweetsByTimeResult {
     success: boolean;
@@ -89,6 +91,7 @@ export declare class GrowOps extends BaseOps {
         statusId: string | null;
         cellInnerDiv: any;
         timestamp?: string | null;
+        authorVerified?: boolean;
     }>, timeFilterHours: number): Promise<FilteredTweet[]>;
     /**
      * Resolve status id from explicit value or permalink in link.

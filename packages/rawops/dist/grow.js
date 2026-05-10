@@ -344,7 +344,8 @@ class GrowOps extends base_1.BaseOps {
                             link: tweet.link,
                             statusId: tweet.statusId,
                             cellInnerDiv: tweet.cellInnerDiv,
-                            timestamp
+                            timestamp,
+                            authorVerified: tweet.authorVerified
                         });
                     }
                 }
@@ -356,7 +357,8 @@ class GrowOps extends base_1.BaseOps {
                         link: tweet.link,
                         statusId: tweet.statusId,
                         cellInnerDiv: tweet.cellInnerDiv,
-                        timestamp: null
+                        timestamp: null,
+                        authorVerified: tweet.authorVerified
                     });
                 }
             }
@@ -370,7 +372,8 @@ class GrowOps extends base_1.BaseOps {
                     link: tweet.link,
                     statusId: tweet.statusId,
                     cellInnerDiv: tweet.cellInnerDiv,
-                    timestamp: null
+                    timestamp: null,
+                    authorVerified: tweet.authorVerified
                 });
             }
         }

@@ -170,6 +170,15 @@ class ProfileOps extends base_1.BaseOps {
             catch (e) {
                 // Could not extract bio
             }
+            try {
+                profileData.is_verified = (await this.driver.executeScript(`
+          const block = document.querySelector('[data-testid="UserName"]');
+          return !!(block && block.querySelector('[data-testid="icon-verified"]'));
+        `));
+            }
+            catch {
+                profileData.is_verified = false;
+            }
             return profileData;
         }
         catch (error) {

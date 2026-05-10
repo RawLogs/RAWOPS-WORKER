@@ -53,6 +53,14 @@ export declare class FollowerDiscoveryOps extends BaseOps {
         reason?: string;
     }>;
     /**
+     * Hover a specific element (e.g. profile name link) and read followers/following from the hover card.
+     */
+    private hoverWebElementAndExtractFollowInfo;
+    /**
+     * Primary tweet author: hover display name / handle and read follower count (for min-follower gates).
+     */
+    extractTweetAuthorFollowersViaHover(tweetElement: WebElement): Promise<number | null>;
+    /**
      * Hover over username and extract follow information
      */
     hoverAndExtractFollowInfo(cell: WebElement, username: string): Promise<{

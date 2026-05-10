@@ -475,13 +475,20 @@ class ScrollOps extends base_1.BaseOps {
             } catch (e) {
               // Timestamp extraction failed, continue without it
             }
+
+            const userNameBlock = tweet.querySelector('[data-testid="UserName"]');
+            const authorVerified = !!(
+              userNameBlock &&
+              userNameBlock.querySelector('[data-testid="icon-verified"]')
+            );
             
             tweetData.push({
               element: tweet,
               link: href,
               statusId: statusId,
               cellInnerDiv: cellInnerDiv,
-              timestamp: timestamp
+              timestamp: timestamp,
+              authorVerified: authorVerified
             });
           });
           
@@ -515,7 +522,8 @@ class ScrollOps extends base_1.BaseOps {
                                     link: tweet.link,
                                     statusId: tweet.statusId,
                                     cellInnerDiv: tweet.cellInnerDiv,
-                                    timestamp: tweet.timestamp
+                                    timestamp: tweet.timestamp,
+                                    authorVerified: tweet.authorVerified
                                 },
                                 scrollSteps: step + 1,
                                 detectedTweets

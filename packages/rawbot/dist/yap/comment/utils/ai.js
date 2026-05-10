@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildContentAI = buildContentAI;
 exports.buildAnalysisAI = buildAnalysisAI;
 exports.getActivePromotionalUrlEntries = getActivePromotionalUrlEntries;
+exports.commentTextContainsPromotionalUrl = commentTextContainsPromotionalUrl;
 exports.resolvePromotionalInjectForCbl = resolvePromotionalInjectForCbl;
 exports.generateCommentWithUserStyles = generateCommentWithUserStyles;
 exports.selectRandomPromptStyle = selectRandomPromptStyle;
@@ -71,6 +72,73 @@ function getActivePromotionalUrlEntries(settings) {
         e.url.trim().length > 0 &&
         typeof e.description === 'string' &&
         e.description.trim().length > 0);
+}
+const HTTP_URL_IN_TEXT = /https?:\/\/[^\s<>"'[\]()]+/gi;
+function extractUrlsFromComment(text) {
+    const m = text.match(HTTP_URL_IN_TEXT);
+    if (!m?.length)
+        return [];
+    return [...new Set(m.map((u) => u.replace(/[),.;:]+$/u, '')))];
+}
+/**
+ * Same tweet on X/Twitter regardless of host (twitter.com vs x.com), www/mobile, or ?query.
+ * Returns lowercase "handle/status/id" or null if not a status URL.
+ */
+function xTwitterStatusKey(url) {
+    const href = url.trim().startsWith('http') ? url.trim() : `https://${url.trim()}`;
+    try {
+        const u = new URL(href);
+        let host = u.hostname.toLowerCase().replace(/^www\./, '').replace(/^mobile\./, '');
+        if (host !== 'x.com' && host !== 'twitter.com')
+            return null;
+        const parts = u.pathname.split('/').filter(Boolean);
+        const statusIdx = parts.findIndex((p) => p.toLowerCase() === 'status');
+        if (statusIdx < 1 || statusIdx + 1 >= parts.length)
+            return null;
+        const handle = parts[statusIdx - 1].toLowerCase();
+        const id = parts[statusIdx + 1].replace(/\D/g, '');
+        if (!id)
+            return null;
+        return `${handle}/status/${id}`;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * True if posted text contains any active promotional list URL (substring), including
+ * common variants (with/without https, www). Used to report shill stats when the
+ * inject step returned null but the model still included a list URL.
+ * X/Twitter: matches twitter.com vs x.com and ignores ?s=20 etc. when the status id matches.
+ */
+function commentTextContainsPromotionalUrl(commentText, settings) {
+    if (!commentText?.trim())
+        return false;
+    const entries = getActivePromotionalUrlEntries(settings);
+    if (!entries.length)
+        return false;
+    const normalized = commentText.toLowerCase().replace(/\s+/g, ' ');
+    const commentUrls = extractUrlsFromComment(commentText);
+    for (const e of entries) {
+        const raw = e.url.trim();
+        if (!raw)
+            continue;
+        const uLower = raw.toLowerCase();
+        if (normalized.includes(uLower))
+            return true;
+        const noProto = uLower.replace(/^https?:\/\/(www\.)?/i, '');
+        if (noProto.length > 6 && normalized.includes(noProto))
+            return true;
+        const keyList = xTwitterStatusKey(raw);
+        if (keyList) {
+            for (const cu of commentUrls) {
+                const keyCu = xTwitterStatusKey(cu);
+                if (keyCu && keyCu === keyList)
+                    return true;
+            }
+        }
+    }
+    return false;
 }
 function stripJsonFence(raw) {
     let t = raw.trim();
@@ -270,7 +338,6 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
             commentUsername: commentUsername
         }, promptToUse, settings.databasePrompt || undefined);
         if (result.success && result.content) {
-            console.log(`[YapComment] Generated comment: "${result.content}"`);
             return result.content;
         }
         else {

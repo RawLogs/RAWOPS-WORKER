@@ -37,6 +37,35 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleScrollAndDetectTweets = handleScrollAndDetectTweets;
 exports.handleScrollAndDetectTweetsByTime = handleScrollAndDetectTweetsByTime;
 const utils_1 = require("../../comment/utils");
+async function evaluateTweetInteractionGate(tweet, settings, drivers) {
+    const onlyVerified = settings?.onlyVerifiedAccounts === true;
+    const minFollowers = Math.max(0, Number(settings?.minFollowersToInteract) || 0);
+    if (!onlyVerified && minFollowers <= 0) {
+        return { ok: true };
+    }
+    if (onlyVerified && !tweet.authorVerified) {
+        return {
+            ok: false,
+            reason: 'Tweet author does not have a verified badge (icon-verified in UserName).'
+        };
+    }
+    if (minFollowers > 0) {
+        const fc = await drivers.followerDiscovery.extractTweetAuthorFollowersViaHover(tweet.element);
+        if (fc === null) {
+            return {
+                ok: false,
+                reason: 'Could not read author follower count from hover card (min followers gate).'
+            };
+        }
+        if (fc < minFollowers) {
+            return {
+                ok: false,
+                reason: `Author has ${fc} followers; minimum required is ${minFollowers}.`
+            };
+        }
+    }
+    return { ok: true };
+}
 /**
  * Handle scroll and detect tweets action
  */
@@ -44,6 +73,7 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
     const { drivers, context } = handlerContext;
     if (!drivers)
         return;
+    context.grow_skip_follow_after_by_time = undefined;
     const maxScrollSteps = params.max_scrolls || params.maxScrolls || 5;
     const detectLimit = params.detect_limit || params.detectLimit || 10;
     // Evaluate interaction rules if settings are provided
@@ -77,6 +107,18 @@ async function handleScrollAndDetectTweets(params, settings, handlerContext) {
     context.detected_tweets = result.detectedTweets;
     // Process interaction if tweet found and actions enabled
     if (result.tweet && (enableLike || enableComment)) {
+        const gate = await evaluateTweetInteractionGate(result.tweet, settings, drivers);
+        if (!gate.ok) {
+            console.log(`[YapGrow] Interaction skipped (targeting gate): ${gate.reason}`);
+            context.detected_target_tweet = null;
+            context.interaction_result = {
+                liked: false,
+                commented: false,
+                gateReason: gate.reason,
+                ...(ruleReason ? { ruleReason } : {})
+            };
+            return;
+        }
         context.detected_target_tweet = result.tweet;
         // Scroll to tweet and extract content using GrowOps
         await drivers.grow.scrollToTweet(result.tweet.cellInnerDiv);
@@ -150,6 +192,7 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
     const { drivers, context } = handlerContext;
     if (!drivers)
         return;
+    context.grow_skip_follow_after_by_time = undefined;
     const maxScrollSteps = params.max_scrolls || params.maxScrolls || 5;
     const detectLimit = params.detect_limit || params.detectLimit || 10;
     // Get time filter from params or settings (default: 24 hours)
@@ -191,6 +234,7 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
         if (enableLike || enableComment) {
             console.log(`[YapGrow] No tweets found within ${timeFilterHours}h time filter, setting interaction_result to { liked: false, commented: false }`);
             context.interaction_result = { liked: false, commented: false };
+            context.grow_skip_follow_after_by_time = true;
         }
         else {
             // If disabled by rules, mark as success with reason
@@ -215,8 +259,17 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
             return 1; // b has timestamp, a doesn't
         return 0; // Both have no timestamp, keep original order
     });
-    // Select the newest tweet (first in sorted array)
-    const targetTweet = sortedTweets[0];
+    let targetTweet = null;
+    let lastGateReason;
+    for (const tw of sortedTweets) {
+        const gate = await evaluateTweetInteractionGate(tw, settings, drivers);
+        if (gate.ok) {
+            targetTweet = tw;
+            break;
+        }
+        lastGateReason = gate.reason;
+        console.log(`[YapGrow] Skipped tweet (targeting gate): ${gate.reason}`);
+    }
     // Process interaction if tweet found and actions enabled
     if (targetTweet && (enableLike || enableComment)) {
         context.detected_target_tweet = {
@@ -269,14 +322,27 @@ async function handleScrollAndDetectTweetsByTime(params, settings, handlerContex
         if (ruleReason) {
             context.interaction_result.ruleReason = ruleReason;
         }
+        context.grow_skip_follow_after_by_time = false;
     }
     else {
         // No tweet found or interactions disabled
         context.detected_target_tweet = null;
         // If interactions were enabled but no tweet found, set result to indicate no interaction attempted
         if (enableLike || enableComment) {
-            console.log(`[YapGrow] No tweet selected or interactions disabled, setting interaction_result to { liked: false, commented: false }`);
-            context.interaction_result = { liked: false, commented: false };
+            context.grow_skip_follow_after_by_time = true;
+            if (sortedTweets.length > 0 && !targetTweet) {
+                console.log(`[YapGrow] No tweet passed verified/min-followers gates, setting interaction_result to { liked: false, commented: false }`);
+                context.interaction_result = {
+                    liked: false,
+                    commented: false,
+                    gateReason: lastGateReason || 'No tweet passed targeting gates.',
+                    ...(ruleReason ? { ruleReason } : {})
+                };
+            }
+            else {
+                console.log(`[YapGrow] No tweet selected or interactions disabled, setting interaction_result to { liked: false, commented: false }`);
+                context.interaction_result = { liked: false, commented: false };
+            }
         }
         else {
             // If disabled by rules, mark as success with reason

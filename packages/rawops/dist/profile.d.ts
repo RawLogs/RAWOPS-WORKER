@@ -15,6 +15,8 @@ export interface ProfileData {
         date: Date | null;
     }>;
     extracted_at: string;
+    /** X / Twitter verified (blue check) visible in profile header UserName. */
+    is_verified?: boolean;
 }
 export interface ExtractProfileOps {
     maxTweets?: number;

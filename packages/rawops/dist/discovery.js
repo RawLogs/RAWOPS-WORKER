@@ -277,28 +277,170 @@ class FollowerDiscoveryOps extends base_1.BaseOps {
         }
     }
     /**
+     * Hover a specific element (e.g. profile name link) and read followers/following from the hover card.
+     */
+    async hoverWebElementAndExtractFollowInfo(hoverTarget, logLabel) {
+        await this.driver.executeScript('arguments[0].scrollIntoView({behavior: "smooth", block: "center"});', hoverTarget);
+        await this.driver.sleep(1000);
+        const actions = this.driver.actions();
+        await actions.move({ origin: hoverTarget }).perform();
+        await this.driver.sleep(2000);
+        let followInfo = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                console.log(`[FollowerDiscoveryOps] Attempt ${attempt} to find hover card (${logLabel})`);
+                const hoverCardSelectors = [
+                    '[data-testid="hoverCardParent"]',
+                    '[data-testid="UserHoverCard"]',
+                    '[role="tooltip"]',
+                    '[data-testid="UserCell"]'
+                ];
+                let hoverCard = null;
+                for (const selector of hoverCardSelectors) {
+                    try {
+                        hoverCard = await this.driver.findElement(selenium_webdriver_1.By.css(selector));
+                        if (hoverCard) {
+                            console.log(`[FollowerDiscoveryOps] Found hover card using selector: ${selector}`);
+                            break;
+                        }
+                    }
+                    catch {
+                        continue;
+                    }
+                }
+                if (hoverCard) {
+                    await this.driver.sleep(2500);
+                    let followersCount = 0;
+                    let followingCount = 0;
+                    try {
+                        const followingLink = await hoverCard.findElement(selenium_webdriver_1.By.xpath('.//a[contains(@href, "/following")]'));
+                        const followingLinkText = await followingLink.getText();
+                        followingCount = this.parseCount(followingLinkText);
+                        console.log(`[FollowerDiscoveryOps] Found following count from link: ${followingCount}`);
+                    }
+                    catch (e) {
+                        console.log(`[FollowerDiscoveryOps] Could not find following link: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                    try {
+                        const followersLink = await hoverCard.findElement(selenium_webdriver_1.By.xpath('.//a[contains(@href, "/followers") or contains(@href, "/verified_followers")]'));
+                        const followersLinkText = await followersLink.getText();
+                        followersCount = this.parseCount(followersLinkText);
+                        console.log(`[FollowerDiscoveryOps] Found followers count from link: ${followersCount}`);
+                    }
+                    catch (e) {
+                        console.log(`[FollowerDiscoveryOps] Could not find followers link: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                    if (followersCount === 0 || followingCount === 0) {
+                        console.log('[FollowerDiscoveryOps] Trying direct span extraction method...');
+                        const allSpans = await hoverCard.findElements(selenium_webdriver_1.By.css('span'));
+                        for (const span of allSpans) {
+                            try {
+                                const text = await span.getText();
+                                const count = this.parseCount(text);
+                                if (count > 0) {
+                                    const parentElement = await span.findElement(selenium_webdriver_1.By.xpath('..'));
+                                    const parentText = await parentElement.getText();
+                                    if (parentText.includes('Following') && followingCount === 0) {
+                                        followingCount = count;
+                                        console.log(`[FollowerDiscoveryOps] Found following count from span: ${followingCount}`);
+                                    }
+                                    else if (parentText.includes('Followers') && followersCount === 0) {
+                                        followersCount = count;
+                                        console.log(`[FollowerDiscoveryOps] Found followers count from span: ${followersCount}`);
+                                    }
+                                }
+                            }
+                            catch {
+                                continue;
+                            }
+                        }
+                    }
+                    if (followersCount > 0 || followingCount > 0) {
+                        followInfo = { followers: followersCount, following: followingCount };
+                        console.log(`[FollowerDiscoveryOps] Extracted follow info (${logLabel}): ${followersCount} followers, ${followingCount} following`);
+                        break;
+                    }
+                }
+                if (followInfo)
+                    break;
+                if (attempt < 3)
+                    await this.driver.sleep(1000);
+            }
+            catch (hoverCardError) {
+                console.log(`[FollowerDiscoveryOps] Attempt ${attempt} failed (${logLabel}): ${hoverCardError instanceof Error ? hoverCardError.message : String(hoverCardError)}`);
+                if (attempt < 3)
+                    await this.driver.sleep(1000);
+            }
+        }
+        await this.driver.sleep(1000);
+        await this.driver.actions().move({ x: 0, y: 0 }).perform();
+        await this.driver.sleep(1000);
+        return followInfo;
+    }
+    /**
+     * Primary tweet author: hover display name / handle and read follower count (for min-follower gates).
+     */
+    async extractTweetAuthorFollowersViaHover(tweetElement) {
+        try {
+            const links = await tweetElement.findElements(selenium_webdriver_1.By.css('[data-testid="UserName"] a[href^="/"]'));
+            const skip = new Set([
+                'home',
+                'i',
+                'explore',
+                'notifications',
+                'messages',
+                'settings',
+                'compose',
+                'search-advanced',
+                'intent',
+                'hashtag'
+            ]);
+            let hoverTarget = null;
+            for (const link of links) {
+                const href = (await link.getAttribute('href')) || '';
+                const pathOnly = href.replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com)/i, '').split('?')[0];
+                const m = pathOnly.match(/^\/([^/]+)\/?$/);
+                if (!m)
+                    continue;
+                const seg = m[1].toLowerCase();
+                if (skip.has(seg))
+                    continue;
+                if (pathOnly.includes('/status/'))
+                    continue;
+                hoverTarget = link;
+                break;
+            }
+            if (!hoverTarget) {
+                console.log('[FollowerDiscoveryOps] No profile link in UserName for tweet author hover');
+                return null;
+            }
+            const info = await this.hoverWebElementAndExtractFollowInfo(hoverTarget, 'tweet-author');
+            return info && info.followers > 0 ? info.followers : null;
+        }
+        catch (error) {
+            console.error(`[FollowerDiscoveryOps] extractTweetAuthorFollowersViaHover: ${error}`);
+            return null;
+        }
+    }
+    /**
      * Hover over username and extract follow information
      */
     async hoverAndExtractFollowInfo(cell, username) {
         try {
             console.log(`[FollowerDiscoveryOps] Hovering over @${username} to extract follow info...`);
-            // Find the username element to hover over
             let usernameElement = null;
             try {
-                // Try to find the username link or text element
                 usernameElement = await cell.findElement(selenium_webdriver_1.By.css('a[href^="/"][href$=""]'));
             }
-            catch (e) {
+            catch {
                 try {
-                    // Try alternative selectors for username
                     usernameElement = await cell.findElement(selenium_webdriver_1.By.css('[data-testid="UserCell"] a'));
                 }
-                catch (e2) {
+                catch {
                     try {
-                        // Try to find any link in the cell
                         usernameElement = await cell.findElement(selenium_webdriver_1.By.css('a[role="link"]'));
                     }
-                    catch (e3) {
+                    catch {
                         console.log(`[FollowerDiscoveryOps] Could not find username element for @${username}`);
                         return null;
                     }
@@ -307,126 +449,7 @@ class FollowerDiscoveryOps extends base_1.BaseOps {
             if (!usernameElement) {
                 return null;
             }
-            // Scroll to ensure element is visible
-            await this.driver.executeScript("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", usernameElement);
-            await this.driver.sleep(1000);
-            // Hover over the username element and keep mouse there
-            const actions = this.driver.actions();
-            await actions.move({ origin: usernameElement }).perform();
-            // Wait longer for hover card to appear and stabilize
-            await this.driver.sleep(2000);
-            // Look for the hover card with follow information
-            let followInfo = null;
-            let hoverCard = null;
-            // Try multiple attempts to find the hover card
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                try {
-                    console.log(`[FollowerDiscoveryOps] Attempt ${attempt} to find hover card for @${username}`);
-                    // Try multiple selectors for the hover card
-                    const hoverCardSelectors = [
-                        '[data-testid="hoverCardParent"]',
-                        '[data-testid="UserHoverCard"]',
-                        '[role="tooltip"]',
-                        '[data-testid="UserCell"]'
-                    ];
-                    for (const selector of hoverCardSelectors) {
-                        try {
-                            hoverCard = await this.driver.findElement(selenium_webdriver_1.By.css(selector));
-                            if (hoverCard) {
-                                console.log(`[FollowerDiscoveryOps] Found hover card using selector: ${selector}`);
-                                break;
-                            }
-                        }
-                        catch (e) {
-                            continue;
-                        }
-                    }
-                    if (hoverCard) {
-                        // Wait a bit more for content to load
-                        await this.driver.sleep(2500);
-                        // Extract followers and following counts from the hover card
-                        let followersCount = 0;
-                        let followingCount = 0;
-                        try {
-                            // Look for following link with count
-                            const followingLink = await hoverCard.findElement(selenium_webdriver_1.By.xpath('.//a[contains(@href, "/following")]'));
-                            const followingLinkText = await followingLink.getText();
-                            followingCount = this.parseCount(followingLinkText);
-                            console.log(`[FollowerDiscoveryOps] Found following count from link: ${followingCount}`);
-                        }
-                        catch (e) {
-                            console.log(`[FollowerDiscoveryOps] Could not find following link: ${e instanceof Error ? e.message : String(e)}`);
-                        }
-                        try {
-                            // Look for followers link with count (verified_followers or followers)
-                            const followersLink = await hoverCard.findElement(selenium_webdriver_1.By.xpath('.//a[contains(@href, "/followers") or contains(@href, "/verified_followers")]'));
-                            const followersLinkText = await followersLink.getText();
-                            followersCount = this.parseCount(followersLinkText);
-                            console.log(`[FollowerDiscoveryOps] Found followers count from link: ${followersCount}`);
-                        }
-                        catch (e) {
-                            console.log(`[FollowerDiscoveryOps] Could not find followers link: ${e instanceof Error ? e.message : String(e)}`);
-                        }
-                        // Method 2: If link method failed, try direct span extraction
-                        if (followersCount === 0 || followingCount === 0) {
-                            console.log('[FollowerDiscoveryOps] Trying direct span extraction method...');
-                            // Look for spans with numbers that are near "Following" or "Followers" text
-                            const allSpans = await hoverCard.findElements(selenium_webdriver_1.By.css('span'));
-                            for (const span of allSpans) {
-                                try {
-                                    const text = await span.getText();
-                                    const count = this.parseCount(text);
-                                    if (count > 0) {
-                                        // Get parent element to check context
-                                        const parentElement = await span.findElement(selenium_webdriver_1.By.xpath('..'));
-                                        const parentText = await parentElement.getText();
-                                        // Check if this span is near "Following" text
-                                        if (parentText.includes('Following') && followingCount === 0) {
-                                            followingCount = count;
-                                            console.log(`[FollowerDiscoveryOps] Found following count from span: ${followingCount}`);
-                                        }
-                                        // Check if this span is near "Followers" text
-                                        else if (parentText.includes('Followers') && followersCount === 0) {
-                                            followersCount = count;
-                                            console.log(`[FollowerDiscoveryOps] Found followers count from span: ${followersCount}`);
-                                        }
-                                    }
-                                }
-                                catch (e) {
-                                    continue;
-                                }
-                            }
-                        }
-                        if (followersCount > 0 || followingCount > 0) {
-                            followInfo = {
-                                followers: followersCount,
-                                following: followingCount
-                            };
-                            console.log(`[FollowerDiscoveryOps] Extracted follow info for @${username}: ${followersCount} followers, ${followingCount} following`);
-                            break; // Success, exit the attempt loop
-                        }
-                    }
-                    if (followInfo) {
-                        break; // Success, exit the attempt loop
-                    }
-                    // If no success, wait a bit more and try again
-                    if (attempt < 3) {
-                        await this.driver.sleep(1000);
-                    }
-                }
-                catch (hoverCardError) {
-                    console.log(`[FollowerDiscoveryOps] Attempt ${attempt} failed to find hover card for @${username}: ${hoverCardError instanceof Error ? hoverCardError.message : String(hoverCardError)}`);
-                    if (attempt < 3) {
-                        await this.driver.sleep(1000);
-                    }
-                }
-            }
-            // Keep mouse on element a bit longer to ensure we got all data
-            await this.driver.sleep(1000);
-            // Move mouse away to dismiss hover card
-            await actions.move({ x: 0, y: 0 }).perform();
-            await this.driver.sleep(1000);
-            return followInfo;
+            return this.hoverWebElementAndExtractFollowInfo(usernameElement, `@${username}`);
         }
         catch (error) {
             console.error(`[FollowerDiscoveryOps] Error hovering over @${username}: ${error}`);

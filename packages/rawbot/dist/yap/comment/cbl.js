@@ -150,10 +150,12 @@ class CommentByLink {
                 console.log(`[YapComment] Processing link ${i + 1}/${filteredLinks.length}: ${link}`);
                 try {
                     const result = await this.processCommentLink(link, settings, run);
+                    console.log(`[YapComment] CBL: processCommentLink done link=${i + 1}/${filteredLinks.length} success=${result.success} commented=${result.commented} usedPromotionalInject=${result.usedPromotionalInject}`);
                     // Check if comment failed (comment is required for success)
                     const commentFailed = !result.commented;
                     // If there's a page error, prioritize that over comment failure
                     if (result.success && !commentFailed) {
+                        console.log(`[YapComment] CBL persist: starting cache + API for link ${i + 1}/${filteredLinks.length} (${link.slice(0, 72)}${link.length > 72 ? '…' : ''})`);
                         processedLinks.push(link);
                         if (result.liked)
                             likesPosted++;
@@ -169,12 +171,18 @@ class CommentByLink {
                         if (parallelResult.errors.length > 0) {
                             errors.push(...parallelResult.errors);
                         }
+                        console.log(`[YapComment] ===== SUBMIT RESULT (success) cache=${parallelResult.cacheSuccess} commentConfigApi=${parallelResult.apiSuccess} interactionLogs=${this.runId ? parallelResult.interactionLogsSuccess : 'skipped(no runId)'} =====`);
                         console.log(`[YapComment] ✅ Successfully processed: ${link}`);
                         if (result.usedPromotionalInject) {
-                            void (0, utils_1.incrementPromotionalSuccessViaAPI)(this.profileId);
+                            console.log('[YapComment] CBL persist: incrementing promotional (shill) stats…');
+                            await (0, utils_1.incrementPromotionalSuccessViaAPI)(this.profileId);
+                        }
+                        else {
+                            console.log('[YapComment] Promotional stats: skipped (no promotional inject or comment text did not contain a list URL)');
                         }
                     }
                     else {
+                        console.log(`[YapComment] CBL persist: SKIPPED (success=${result.success}, commented=${result.commented}, commentFailed=${commentFailed}) for ${link.slice(0, 64)}`);
                         failedLinks.push(link);
                         // Prioritize page error messages over comment failure
                         const errorMsg = result.error || (commentFailed ? 'Comment failed - no comment posted' : 'Processing failed');
@@ -190,6 +198,7 @@ class CommentByLink {
                         if (parallelResult.errors.length > 0) {
                             errors.push(...parallelResult.errors);
                         }
+                        console.log(`[YapComment] Submit result (failed): cache=${parallelResult.cacheSuccess} commentConfigApi=${parallelResult.apiSuccess} interactionLogs=${this.runId ? parallelResult.interactionLogsSuccess : 'skipped(no runId)'}`);
                         console.log(`[YapComment] ❌ Failed to process: ${link} - ${errorMsg}`);
                     }
                     // Delay between links
@@ -340,6 +349,7 @@ class CommentByLink {
             // Step 7: COMMENT LOGIC - Decide whether to reply to comment or main tweet
             let commented = false;
             let hadPromotionalSelection = null;
+            let postedCommentText;
             if (postContent) {
                 try {
                     // Check if we should reply to a comment instead of the main tweet
@@ -360,6 +370,7 @@ class CommentByLink {
                         if (commentText) {
                             console.log(`[YapComment] Generated reply to comment: "${commentText}"`);
                             console.log('[YapComment] Posting reply to comment...');
+                            postedCommentText = commentText;
                             // Click reply button on the specific tweet element
                             if (otherUserTweetAnalysis.lastTweetElement) {
                                 try {
@@ -407,6 +418,7 @@ class CommentByLink {
                         if (commentText) {
                             console.log(`[YapComment] Generated comment: "${commentText}"`);
                             console.log('[YapComment] Posting comment...');
+                            postedCommentText = commentText;
                             const commentResult = await this.commentOps.commentOnFirstTweet(commentText, {
                                 useAntiDetection: true,
                                 behavioralPattern: 'browsing',
@@ -431,21 +443,33 @@ class CommentByLink {
                     hasAI: !!this.contentAI
                 });
             }
-            // Random scroll after comment with anti-detection
-            if (commented) {
+            const countPromoShill = commented &&
+                settings.promotionalUrlListEnabled &&
+                (!!hadPromotionalSelection || (0, utils_1.commentTextContainsPromotionalUrl)(postedCommentText, settings));
+            if (countPromoShill) {
+                const via = hadPromotionalSelection ? 'list inject (AI index)' : 'URL in posted text matches list';
+                console.log(`[YapComment] Promotional shill qualifies for stats (${via})`);
+            }
+            else if (commented && settings.promotionalUrlListEnabled) {
+                console.log('[YapComment] Promotional shill: not counted (no inject + URL in comment did not match list, or list disabled)');
+            }
+            console.log(`[YapComment] CBL: end-of-link commented=${commented} promoForStats=${!!countPromoShill} — post-comment scrolls (errors do not cancel comment success)`);
+            try {
+                if (commented) {
+                    await (0, utils_1.performRandomScrollPattern)(driver, this.scrollOps, this.commentOps);
+                    await (0, utils_1.performIdleScroll)(driver, this.scrollOps, this.commentOps);
+                }
                 await (0, utils_1.performRandomScrollPattern)(driver, this.scrollOps, this.commentOps);
-                // Random idle scroll
                 await (0, utils_1.performIdleScroll)(driver, this.scrollOps, this.commentOps);
             }
-            // Step 8: Final random scroll pattern
-            await (0, utils_1.performRandomScrollPattern)(driver, this.scrollOps, this.commentOps);
-            // Final idle scroll
-            await (0, utils_1.performIdleScroll)(driver, this.scrollOps, this.commentOps);
+            catch (scrollErr) {
+                console.error('[YapComment] CBL: post-comment scroll failed — comment still counts as posted:', scrollErr);
+            }
             return {
                 success: commented, // Only success if comment was posted
                 liked,
                 commented,
-                usedPromotionalInject: !!(commented && hadPromotionalSelection)
+                usedPromotionalInject: !!countPromoShill
             };
         }
         catch (error) {

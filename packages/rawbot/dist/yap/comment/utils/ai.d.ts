@@ -12,6 +12,13 @@ export declare function getActivePromotionalUrlEntries(settings: YapCommentSetti
     description: string;
 }>;
 /**
+ * True if posted text contains any active promotional list URL (substring), including
+ * common variants (with/without https, www). Used to report shill stats when the
+ * inject step returned null but the model still included a list URL.
+ * X/Twitter: matches twitter.com vs x.com and ignores ?s=20 etc. when the status id matches.
+ */
+export declare function commentTextContainsPromotionalUrl(commentText: string | undefined, settings: YapCommentSettings): boolean;
+/**
  * CBL: pick at most one promotional row that fits the post (Selenium-extracted text + optional reply snippet).
  */
 export declare function resolvePromotionalInjectForCbl(postContent: string, replyContext: string | undefined, settings: YapCommentSettings): Promise<{

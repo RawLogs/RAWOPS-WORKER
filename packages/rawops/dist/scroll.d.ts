@@ -83,6 +83,7 @@ export declare class ScrollOps extends BaseOps {
             statusId: string | null;
             cellInnerDiv: any;
             timestamp: string | null;
+            authorVerified?: boolean;
         } | null;
         scrollSteps: number;
         detectedTweets: Array<{
@@ -91,6 +92,7 @@ export declare class ScrollOps extends BaseOps {
             statusId: string | null;
             cellInnerDiv: any;
             timestamp: string | null;
+            authorVerified?: boolean;
         }>;
     }>;
 }
