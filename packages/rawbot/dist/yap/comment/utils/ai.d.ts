@@ -12,6 +12,24 @@ export declare function getActivePromotionalUrlEntries(settings: YapCommentSetti
     description: string;
 }>;
 /**
+ * Marker inside a promotional row `description`. Any **active list row** whose
+ * description contains this token contributes the text **after** the marker as
+ * owner rules: they are **prepended** to the style prompt so the model reads them
+ * first (e.g. “mọi comment phải có link shill”), including when no inject URL was
+ * chosen for this reply. Text before the marker stays relevance-only for fit/inject;
+ * http(s) URLs are stripped from segments sent to the model (URL is on the inject line).
+ */
+export declare const RAWOPS_IMPORTANT_PROMPT = "RAWOPS_IMPORTANT_PROMPT";
+export declare function stripHttpUrlsFromText(text: string): string;
+/**
+ * Split optional owner prompt from CBL description; always strip http(s) URLs from
+ * segments sent to the model (avoids duplicating the URL next to the dedicated inject line).
+ */
+export declare function splitPromotionalDescriptionForPipeline(description: string): {
+    relevanceForInjectAndSelection: string;
+    userPriorityAddon: string;
+};
+/**
  * True if posted text contains any active promotional list URL (substring), including
  * common variants (with/without https, www). Used to report shill stats when the
  * inject step returned null but the model still included a list URL.
@@ -25,6 +43,15 @@ export declare function resolvePromotionalInjectForCbl(postContent: string, repl
     url: string;
     description: string;
 } | null>;
+/**
+ * When AI selection returns null (no “fit” row) but the list is non-empty, pick a row so
+ * generation still gets PROMOTIONAL LINK lines. Prefers a row whose description contains
+ * {@link RAWOPS_IMPORTANT_PROMPT}; otherwise the first active entry.
+ */
+export declare function getPromotionalInjectFallbackForCbl(settings: YapCommentSettings): {
+    url: string;
+    description: string;
+} | null;
 /**
  * Generate comment with user styles using available prompt styles.
  *

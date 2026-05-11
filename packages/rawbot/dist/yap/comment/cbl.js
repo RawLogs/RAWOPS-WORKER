@@ -350,6 +350,7 @@ class CommentByLink {
             let commented = false;
             let hadPromotionalSelection = null;
             let postedCommentText;
+            let promotionalInjectFromAiFit = null;
             if (postContent) {
                 try {
                     // Check if we should reply to a comment instead of the main tweet
@@ -361,6 +362,14 @@ class CommentByLink {
                             ? otherUserTweetAnalysis.lastTweetContent
                             : undefined;
                         promotionalInject = await (0, utils_1.resolvePromotionalInjectForCbl)(postContent, replySnippet, settings);
+                        promotionalInjectFromAiFit = promotionalInject;
+                        if (!promotionalInject) {
+                            const fb = (0, utils_1.getPromotionalInjectFallbackForCbl)(settings);
+                            if (fb) {
+                                promotionalInject = fb;
+                                console.log('[YapComment] Promotional URL list: AI selected no index — using fallback list row so URL inject + RAWOPS_IMPORTANT_PROMPT rules still apply');
+                            }
+                        }
                     }
                     hadPromotionalSelection = promotionalInject;
                     if (otherUserTweetAnalysis.hasOtherUserTweet && otherUserTweetAnalysis.lastTweetContent) {
@@ -447,7 +456,11 @@ class CommentByLink {
                 settings.promotionalUrlListEnabled &&
                 (!!hadPromotionalSelection || (0, utils_1.commentTextContainsPromotionalUrl)(postedCommentText, settings));
             if (countPromoShill) {
-                const via = hadPromotionalSelection ? 'list inject (AI index)' : 'URL in posted text matches list';
+                const via = promotionalInjectFromAiFit
+                    ? 'list inject (AI index)'
+                    : hadPromotionalSelection
+                        ? 'list inject (fallback row)'
+                        : 'URL in posted text matches list';
                 console.log(`[YapComment] Promotional shill qualifies for stats (${via})`);
             }
             else if (commented && settings.promotionalUrlListEnabled) {

@@ -1,11 +1,15 @@
 "use strict";
 // packages/rawbot/src/yap/comment/utils/ai.ts
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.RAWOPS_IMPORTANT_PROMPT = void 0;
 exports.buildContentAI = buildContentAI;
 exports.buildAnalysisAI = buildAnalysisAI;
 exports.getActivePromotionalUrlEntries = getActivePromotionalUrlEntries;
+exports.stripHttpUrlsFromText = stripHttpUrlsFromText;
+exports.splitPromotionalDescriptionForPipeline = splitPromotionalDescriptionForPipeline;
 exports.commentTextContainsPromotionalUrl = commentTextContainsPromotionalUrl;
 exports.resolvePromotionalInjectForCbl = resolvePromotionalInjectForCbl;
+exports.getPromotionalInjectFallbackForCbl = getPromotionalInjectFallbackForCbl;
 exports.generateCommentWithUserStyles = generateCommentWithUserStyles;
 exports.selectRandomPromptStyle = selectRandomPromptStyle;
 exports.cleanCommentForBMP = cleanCommentForBMP;
@@ -74,7 +78,78 @@ function getActivePromotionalUrlEntries(settings) {
         e.description.trim().length > 0);
 }
 const HTTP_URL_IN_TEXT = /https?:\/\/[^\s<>"'[\]()]+/gi;
+/**
+ * Marker inside a promotional row `description`. Any **active list row** whose
+ * description contains this token contributes the text **after** the marker as
+ * owner rules: they are **prepended** to the style prompt so the model reads them
+ * first (e.g. “mọi comment phải có link shill”), including when no inject URL was
+ * chosen for this reply. Text before the marker stays relevance-only for fit/inject;
+ * http(s) URLs are stripped from segments sent to the model (URL is on the inject line).
+ */
+exports.RAWOPS_IMPORTANT_PROMPT = 'RAWOPS_IMPORTANT_PROMPT';
+/** Matches the literal token with optional spaces and one optional colon before owner text. */
+const RAWOPS_IMPORTANT_PROMPT_LEADER = /RAWOPS_IMPORTANT_PROMPT\s*:?/;
+function stripHttpUrlsFromText(text) {
+    if (!text?.trim())
+        return '';
+    HTTP_URL_IN_TEXT.lastIndex = 0;
+    return text.replace(HTTP_URL_IN_TEXT, ' ').replace(/\s+/g, ' ').trim();
+}
+/**
+ * Split optional owner prompt from CBL description; always strip http(s) URLs from
+ * segments sent to the model (avoids duplicating the URL next to the dedicated inject line).
+ */
+function splitPromotionalDescriptionForPipeline(description) {
+    const raw = description.trim();
+    if (!raw) {
+        return { relevanceForInjectAndSelection: '', userPriorityAddon: '' };
+    }
+    const m = raw.match(RAWOPS_IMPORTANT_PROMPT_LEADER);
+    if (!m || m.index === undefined) {
+        return {
+            relevanceForInjectAndSelection: stripHttpUrlsFromText(raw),
+            userPriorityAddon: ''
+        };
+    }
+    const relevancePart = raw.slice(0, m.index).trim();
+    const userPart = raw.slice(m.index + m[0].length).trim();
+    return {
+        relevanceForInjectAndSelection: stripHttpUrlsFromText(relevancePart),
+        userPriorityAddon: stripHttpUrlsFromText(userPart)
+    };
+}
+/** Owner add-ons from every list row whose description includes {@link RAWOPS_IMPORTANT_PROMPT}. */
+function collectPromotionalOwnerAddonsFromSettings(settings) {
+    const entries = getActivePromotionalUrlEntries(settings);
+    if (!entries.length)
+        return [];
+    const seen = new Set();
+    const out = [];
+    for (const e of entries) {
+        if (e.description.search(RAWOPS_IMPORTANT_PROMPT_LEADER) < 0)
+            continue;
+        const { userPriorityAddon } = splitPromotionalDescriptionForPipeline(e.description);
+        if (!userPriorityAddon)
+            continue;
+        const dedupeKey = userPriorityAddon.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (seen.has(dedupeKey))
+            continue;
+        seen.add(dedupeKey);
+        out.push(userPriorityAddon);
+    }
+    return out;
+}
+function buildPromotionalOwnerPriorityPrefixBlock(addons) {
+    if (!addons.length)
+        return null;
+    const body = addons.map((a, i) => `(${i + 1})\n${a}`).join('\n\n');
+    return [
+        'PROMOTIONAL_LIST_OWNER_RULES (read and obey first; applies to this reply even if style or length hints below conflict):',
+        body
+    ].join('\n');
+}
 function extractUrlsFromComment(text) {
+    HTTP_URL_IN_TEXT.lastIndex = 0;
     const m = text.match(HTTP_URL_IN_TEXT);
     if (!m?.length)
         return [];
@@ -181,7 +256,11 @@ async function resolvePromotionalInjectForCbl(postContent, replyContext, setting
     const maxItems = 24;
     const list = entries.slice(0, maxItems);
     const enumerated = list
-        .map((e, i) => `${i}:\n  url: ${JSON.stringify(e.url)}\n  description: ${JSON.stringify(e.description.slice(0, 2000))}`)
+        .map((e, i) => {
+        const { relevanceForInjectAndSelection } = splitPromotionalDescriptionForPipeline(e.description);
+        const descForPicker = relevanceForInjectAndSelection.slice(0, 2000);
+        return `${i}:\n  url: ${JSON.stringify(e.url)}\n  description: ${JSON.stringify(descForPicker)}`;
+    })
         .join('\n\n');
     const prompt = `You choose at most ONE promotional entry for a reply to a social post.
 
@@ -212,6 +291,22 @@ Rules:
     const chosen = list[idx];
     console.log(`[YapComment] Promotional URL list: selected index ${idx} url=${chosen.url.substring(0, 48)}...`);
     return chosen;
+}
+/**
+ * When AI selection returns null (no “fit” row) but the list is non-empty, pick a row so
+ * generation still gets PROMOTIONAL LINK lines. Prefers a row whose description contains
+ * {@link RAWOPS_IMPORTANT_PROMPT}; otherwise the first active entry.
+ */
+function getPromotionalInjectFallbackForCbl(settings) {
+    const entries = getActivePromotionalUrlEntries(settings);
+    if (!entries.length)
+        return null;
+    for (const e of entries) {
+        if (e.description.search(RAWOPS_IMPORTANT_PROMPT_LEADER) >= 0) {
+            return e;
+        }
+    }
+    return entries[0];
 }
 /**
  * Generate comment with user styles using available prompt styles.
@@ -282,13 +377,26 @@ async function generateCommentWithUserStyles(postContent, settings, commentConte
                 }
             }
         }
+        const promoOwnerAddons = collectPromotionalOwnerAddonsFromSettings(settings);
+        const promoOwnerPrefix = buildPromotionalOwnerPriorityPrefixBlock(promoOwnerAddons);
+        if (promoOwnerPrefix) {
+            const merged = promptToUse.trim();
+            promptToUse = merged ? `${promoOwnerPrefix}\n\n${merged}` : promoOwnerPrefix;
+            console.log(`[YapComment] Prepended promotional list owner rules (${promoOwnerAddons.length} block(s) from rows containing RAWOPS_IMPORTANT_PROMPT)`);
+        }
         if (promotionalInject?.url?.trim()) {
+            const { relevanceForInjectAndSelection } = splitPromotionalDescriptionForPipeline(promotionalInject.description || '');
+            const angleLines = relevanceForInjectAndSelection.length > 0
+                ? [
+                    'Relevance angle (use only if it still matches the thread naturally):',
+                    relevanceForInjectAndSelection
+                ]
+                : [];
             const injectBlock = [
                 'PROMOTIONAL LINK (contextual, CBL — in addition to your prompt style above):',
                 'Include this URL exactly once as plain text in the reply (no markdown link syntax):',
                 promotionalInject.url.trim(),
-                'Relevance angle (use only if it still matches the thread naturally):',
-                promotionalInject.description.trim(),
+                ...angleLines,
                 'Write a natural reply; do not label as promotion or sponsorship. Keep the voice and rules from the prompt style / database instructions.'
             ].join('\n');
             const basePrompt = promptToUse.trim();
