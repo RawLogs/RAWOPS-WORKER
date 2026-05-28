@@ -180,16 +180,36 @@ class ProfileOps extends base_1.BaseOps {
             }
             try {
                 profileData.is_verified = (await this.driver.executeScript(`
+          const targetUsername = (arguments[0] || '').toString().trim().toLowerCase();
           const col = document.querySelector('[data-testid="primaryColumn"]');
           const root = col || document;
-          const user = root.querySelector('[data-testid="UserName"], [data-testid="User-Name"]');
-          if (!user) return false;
-          return !!(
-            user.querySelector('[data-testid="icon-verified"]') ||
-            user.querySelector('svg[aria-label="Verified account"]') ||
-            user.querySelector('button[aria-label*="verified account" i]')
+          const candidates = Array.from(
+            root.querySelectorAll('[data-testid="UserName"], [data-testid="User-Name"]')
           );
-        `));
+
+          const hasVerifiedBadge = (el) => !!(
+            el.querySelector('[data-testid="icon-verified"]') ||
+            el.querySelector('svg[aria-label="Verified account"]') ||
+            el.querySelector('button[aria-label*="verified account" i]') ||
+            el.querySelector('button[aria-label*="verified accounts" i]')
+          );
+
+          if (candidates.length === 0) return false;
+
+          // Prefer matching the header block containing the target @username.
+          if (targetUsername) {
+            const expectedHandle = '@' + targetUsername;
+            for (const el of candidates) {
+              const text = (el.textContent || '').toLowerCase();
+              if (text.includes(expectedHandle)) {
+                return hasVerifiedBadge(el);
+              }
+            }
+          }
+
+          // Fallback: if any visible UserName block has verified badge, treat as verified.
+          return candidates.some(hasVerifiedBadge);
+        `, profileData.username));
             }
             catch {
                 profileData.is_verified = false;
