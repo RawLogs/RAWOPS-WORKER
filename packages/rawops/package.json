@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/selenium-webdriver": "^4.35.1",
     "typescript": "^5.0.0"
   },
   "keywords": [

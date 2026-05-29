@@ -113,7 +113,7 @@ class ExtractionOps extends base_1.BaseOps {
                     if (allText && allText.trim().length > 0) {
                         // Extract just the main content (remove username, timestamp, etc.)
                         const lines = allText.split('\n');
-                        const contentLines = lines.filter(line => line.trim().length > 0 &&
+                        const contentLines = lines.filter((line) => line.trim().length > 0 &&
                             !line.includes('@') &&
                             !line.includes('·') &&
                             !line.includes('Replying to') &&
